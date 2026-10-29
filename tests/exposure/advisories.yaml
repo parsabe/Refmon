@@ -1,0 +1,20 @@
+# Local advisory fixtures for S16, S28 and S29. Nothing here is fetched from anywhere.
+advisories:
+  - id: ADV-2026-001
+    component: webshop
+    affected: ">=3.0,<3.1.4"
+    fixed_in: "3.1.4"
+    severity: critical
+  - id: ADV-2026-002
+    component: report-engine
+    affected: "<5.2"
+    fixed_in: "5.2"
+    severity: high
+    workaround:
+      flag: disable_remote_templates
+      value: true
+  - id: ADV-2026-003
+    component: legacy-node
+    end_of_life: true
+    severity: high
+    affected: "<13"

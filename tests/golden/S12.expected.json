@@ -1,0 +1,29 @@
+{
+  "title": "AI agent runs command from injected web content",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "fetch",
+    "hide"
+  ],
+  "known_gap": false,
+  "scenario": "S12",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-1200"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-1201"
+    }
+  ]
+}

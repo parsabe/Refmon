@@ -1,0 +1,13 @@
+{
+  "scenario": "S09",
+  "title": "Package from official index",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "questions_failed": [],
+  "effects": [],
+  "override": "trusted_root",
+  "actions": [],
+  "notes": "Source is a trusted root (policy rule official-python-index, recorded by Observe as the trusted_source attribute), so no label is created."
+}

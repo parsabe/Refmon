@@ -1,0 +1,13 @@
+{
+  "scenario": "S11",
+  "title": "Developer copies doc command, local effect",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "hold",
+  "decided_in_phase": "4b",
+  "questions_failed": ["origin", "contract"],
+  "effects": [],
+  "actions": [],
+  "notes": "Two questions fail, so the plain 3/2/1 rule says hold. The evidence calculus (C11 worked check: origin 0.8 + contract 1.0 = 1.8, L = -5.11, below the hold threshold -4.94) says allow, and C8 expects allow. The calculus decides from Phase 4b on (docs/design-decisions.md, D1); in Phase 1 this file is judged on its two failed questions and no effect."
+}

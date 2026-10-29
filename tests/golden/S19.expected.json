@@ -1,0 +1,244 @@
+{
+  "title": "Process changes many files rapidly (ransomware stand-in; story includes an initial-access label)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "mass_change"
+  ],
+  "known_gap": false,
+  "scenario": "S19",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-1900"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000002"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000003"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000004"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000005"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000006"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000007"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000008"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000009"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000010"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000011"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000012"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000013"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000014"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000015"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000016"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000017"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000018"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000019"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000020"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000021"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000022"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000023"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000024"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000025"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000026"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000027"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000028"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000029"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000030"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000031"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000032"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000033"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000034"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000035"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000036"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000037"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000038"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000039"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000040"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000041"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000042"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000043"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000044"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000045"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000046"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000047"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000048"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000049"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000050"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000051"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000052"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000053"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000054"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000055"
+    },
+    {
+      "type": "restore_file",
+      "object_of_event": "e-000056"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Node app server legitimately runs an approved build tool child process",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin"
+  ],
+  "known_gap": false,
+  "scenario": "S30"
+}

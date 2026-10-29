@@ -1,0 +1,32 @@
+{
+  "title": "Node app server fetches an external URL, response triggers an executable file write",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "persist"
+  ],
+  "known_gap": false,
+  "scenario": "S26c",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-2600"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-2600"
+    },
+    {
+      "type": "quarantine_file",
+      "object_of_event": "e-000003"
+    }
+  ]
+}

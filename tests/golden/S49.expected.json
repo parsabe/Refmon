@@ -1,0 +1,23 @@
+{
+  "title": "Signed vendor installer downloaded from the internet persists (role other, no contract)",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "hold",
+  "rule_decision": "hold",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "effect"
+  ],
+  "effects": [
+    "persist"
+  ],
+  "known_gap": false,
+  "scenario": "S49",
+  "actions": [
+    {
+      "type": "hold",
+      "process": "p-4901"
+    }
+  ]
+}

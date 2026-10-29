@@ -1,0 +1,16 @@
+{
+  "scenario": "S01",
+  "title": "Fake CAPTCHA, command pasted into run dialog",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "questions_failed": ["origin", "contract", "effect"],
+  "effects": ["hide", "fetch"],
+  "actions": [
+    { "type": "kill_process_tree", "process": "p-211" },
+    { "type": "cut_network", "process": "p-212" },
+    { "type": "quarantine_file", "object_of_event": "e-000007" }
+  ],
+  "notes": "Containment root is the process the labeled command ran in (p-211, started by the run dialog p-210); its descendants are covered by the tree kill."
+}

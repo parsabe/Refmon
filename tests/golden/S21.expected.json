@@ -1,0 +1,30 @@
+{
+  "title": "Package install script reads credentials or persists",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "credential",
+    "persist"
+  ],
+  "known_gap": false,
+  "notes": "The package comes from an unlisted mirror, not the trusted official index; a trusted source is an absolute allow.",
+  "scenario": "S21",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-2100"
+    },
+    {
+      "type": "revert_persistence",
+      "object_of_event": "e-000004"
+    }
+  ]
+}

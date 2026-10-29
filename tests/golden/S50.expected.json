@@ -1,0 +1,23 @@
+{
+  "title": "Backup job (contract allows mass change) changes many files in a story with an external origin label",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "hold",
+  "rule_decision": "hold",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "effect"
+  ],
+  "effects": [
+    "mass_change"
+  ],
+  "known_gap": false,
+  "scenario": "S50",
+  "actions": [
+    {
+      "type": "hold",
+      "process": "p-5000"
+    }
+  ]
+}

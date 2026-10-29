@@ -1,0 +1,6 @@
+# runtimes that inventories tend to miss (CLAUDE.md C5)
+components:
+  - {name: webshop, version: 3.0.2, role: web_worker, exposed: true, kind: container, host: pod-web-7}
+  - {name: legacy-node, version: "10.4", role: node_app_server, exposed: true, kind: bundled_runtime, host: ws-design-12}
+  - {name: report-engine, version: "5.0", role: app_server, exposed: true, kind: appliance, host: mfp-3f}
+  - {name: webshop, version: 3.0.9, role: web_worker, exposed: true, kind: decentral_server, host: dept-lab-server}

@@ -1,0 +1,33 @@
+{
+  "title": "Command copied from PDF, pasted",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "hide",
+    "fetch"
+  ],
+  "known_gap": false,
+  "scenario": "S04",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-412"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-412"
+    },
+    {
+      "type": "quarantine_file",
+      "object_of_event": "e-000006"
+    }
+  ]
+}

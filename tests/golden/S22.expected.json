@@ -1,0 +1,24 @@
+{
+  "title": "Attacker abuses app's own allowed DB connection to read data",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "hold",
+  "rule_decision": "hold",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "effect"
+  ],
+  "effects": [
+    "exfil"
+  ],
+  "known_gap": true,
+  "notes": "Known gap: no contract is broken, only the transferred volume stands out.",
+  "scenario": "S22",
+  "actions": [
+    {
+      "type": "hold",
+      "process": "p-2200"
+    }
+  ]
+}

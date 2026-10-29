@@ -1,0 +1,26 @@
+{
+  "title": "Labeled process reads the real browser credential store (infostealer stand-in)",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "credential",
+    "asset_access"
+  ],
+  "override": "protected_asset",
+  "known_gap": false,
+  "scenario": "S34",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-3401"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+components:
+  - name: report-engine
+    version: "5.1"
+    role: app_server
+    exposed: true
+    kind: service
+    flags: {disable_remote_templates: false}

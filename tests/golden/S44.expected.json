@@ -1,0 +1,10 @@
+{
+  "title": "Nightly backup sends a large volume to the known backup host",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "known_gap": false,
+  "scenario": "S44"
+}

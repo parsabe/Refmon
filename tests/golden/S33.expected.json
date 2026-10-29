@@ -1,0 +1,34 @@
+{
+  "title": "Downloaded fake installer runs, persists and contacts an unknown host",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "hide",
+    "fetch",
+    "persist"
+  ],
+  "known_gap": false,
+  "scenario": "S33",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-3301"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-3301"
+    },
+    {
+      "type": "revert_persistence",
+      "object_of_event": "e-000005"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "Document from a mail attachment makes the office app start a script host (macro stand-in)",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "fetch",
+    "persist"
+  ],
+  "known_gap": false,
+  "scenario": "S31",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-3101"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-3102"
+    },
+    {
+      "type": "revert_persistence",
+      "object_of_event": "e-000005"
+    }
+  ]
+}

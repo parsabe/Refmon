@@ -1,0 +1,33 @@
+{
+  "title": "Compromised host opens new connections to many internal hosts (story includes an initial-access label)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "fetch",
+    "lateral"
+  ],
+  "known_gap": false,
+  "scenario": "S18",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-1800"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-1801"
+    },
+    {
+      "type": "isolate_host",
+      "host": "dev-b21c"
+    }
+  ]
+}

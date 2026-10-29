@@ -1,0 +1,13 @@
+{
+  "title": "User opens and prints a normal document from a removable medium",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin"
+  ],
+  "known_gap": false,
+  "scenario": "S38"
+}

@@ -1,0 +1,24 @@
+{
+  "title": "Service process gains elevated privileges (story includes an initial-access label)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "escalate"
+  ],
+  "known_gap": false,
+  "scenario": "S17",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-1700"
+    }
+  ]
+}

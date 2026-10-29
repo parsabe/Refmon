@@ -1,0 +1,4 @@
+components:
+  - {name: webshop, version: 3.1.0, role: web_worker, exposed: true, kind: service}
+  - {name: db-engine, version: "9.1", role: db_server, exposed: false, kind: service}
+  - {name: cache-lib, version: 2.0.1, role: app_server, exposed: false, kind: package}

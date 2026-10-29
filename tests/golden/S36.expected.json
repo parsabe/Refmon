@@ -1,0 +1,13 @@
+{
+  "title": "User opens a normal PDF from a mail attachment and prints it",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin"
+  ],
+  "known_gap": false,
+  "scenario": "S36"
+}

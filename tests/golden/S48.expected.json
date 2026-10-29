@@ -1,0 +1,10 @@
+{
+  "title": "Patch tool (contract allows tampering) stops services, among them a security service",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "known_gap": false,
+  "scenario": "S48"
+}

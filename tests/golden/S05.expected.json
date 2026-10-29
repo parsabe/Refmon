@@ -1,0 +1,24 @@
+{
+  "title": "Command typed by hand from a video",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "hold",
+  "rule_decision": "allow",
+  "decided_in_phase": "4b",
+  "questions_failed": [
+    "effect"
+  ],
+  "effects": [
+    "hide",
+    "fetch"
+  ],
+  "known_gap": true,
+  "notes": "Known gap. No label, so Origin and the external-exec contract cannot fire; only Effect does. The fail rule allows it; the evidence calculus (effect 2.5 alone, L -4.41) holds it.",
+  "scenario": "S05",
+  "actions": [
+    {
+      "type": "hold",
+      "process": "p-501"
+    }
+  ]
+}

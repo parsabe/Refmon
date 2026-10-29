@@ -1,0 +1,13 @@
+{
+  "title": "Web worker writes normal cache and session files",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin"
+  ],
+  "known_gap": false,
+  "scenario": "S23"
+}

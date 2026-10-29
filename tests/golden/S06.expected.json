@@ -1,0 +1,42 @@
+{
+  "title": "Persistence now, payload runs a day later",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "persist",
+    "fetch"
+  ],
+  "known_gap": false,
+  "notes": "The delayed run is a new story. Its Contract signal comes from the persistent label of the startup item (contract evidence, D21).",
+  "scenario": "S06",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-602"
+    },
+    {
+      "type": "kill_process_tree",
+      "process": "p-9002"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-9002"
+    },
+    {
+      "type": "revert_persistence",
+      "object_of_event": "e-000005"
+    },
+    {
+      "type": "quarantine_file",
+      "object_of_event": "e-000008"
+    }
+  ]
+}

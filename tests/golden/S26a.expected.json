@@ -1,0 +1,15 @@
+{
+  "title": "Node app server fetches an external URL, response leads to a non-executable file write (cache)",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "hold",
+  "decided_in_phase": "4b",
+  "questions_failed": [
+    "origin",
+    "contract"
+  ],
+  "known_gap": false,
+  "notes": "Two questions fail, so the plain rule says hold; the evidence calculus (origin 0.8 + contract 1.0, L -5.11) allows it, as C8 expects (design decision D1).",
+  "scenario": "S26a"
+}

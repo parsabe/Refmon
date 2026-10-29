@@ -1,0 +1,1 @@
+{"event_id":"e-000001","ts":"2026-10-28T10:02:15.120000Z","device":"dev-7f3a","type":"exec","actor":{"id":"p-4500","parent":"p-1","role":"agent","interactive":false,"user":"svc-agent"},"object":{"class":"command_text","fingerprint":"hmac:28e01f1d7fef56d68025053d37052dfd0de0871c4b91e8c3d75cfb11f4f0d087"},"attrs":{"exec_class":"agent_tools"}}

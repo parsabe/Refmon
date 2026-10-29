@@ -1,0 +1,12 @@
+{
+  "scenario": "S10",
+  "title": "Admin runs own local script",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "questions_failed": [],
+  "effects": [],
+  "actions": [],
+  "notes": "Source class is internal, so no label is created."
+}

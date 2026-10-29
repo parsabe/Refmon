@@ -1,0 +1,15 @@
+{
+  "scenario": "S14",
+  "title": "Web worker writes new executable script file into web root (web shell stand-in)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "questions_failed": ["origin", "contract", "effect"],
+  "effects": ["persist"],
+  "actions": [
+    { "type": "quarantine_file", "object_of_event": "e-000002" },
+    { "type": "kill_process_tree", "process": "p-1842" }
+  ],
+  "notes": "The written file is quarantined (moved, never deleted) and the worker is killed."
+}

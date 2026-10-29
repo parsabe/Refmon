@@ -1,0 +1,19 @@
+{
+  "title": "IT installs signed software from the university software portal",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "persist"
+  ],
+  "override": "trusted_root",
+  "known_gap": false,
+  "notes": "Contract and Effect both fail (the installer persists), yet a trusted source is an absolute allow.",
+  "scenario": "S37"
+}

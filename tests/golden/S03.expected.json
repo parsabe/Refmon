@@ -1,0 +1,33 @@
+{
+  "title": "Command pasted into file manager address bar",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "hide",
+    "fetch"
+  ],
+  "known_gap": false,
+  "scenario": "S03",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-311"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-312"
+    },
+    {
+      "type": "quarantine_file",
+      "object_of_event": "e-000007"
+    }
+  ]
+}

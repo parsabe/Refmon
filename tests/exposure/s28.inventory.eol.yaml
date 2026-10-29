@@ -1,0 +1,4 @@
+# a runtime that nobody maintains any more, inside a container; not reachable from outside
+components:
+  - {name: legacy-node, version: "12.22", role: node_app_server, exposed: false, kind: container, host: srv-legacy-1, end_of_life: true}
+  - {name: webshop, version: 3.1.4, role: web_worker, exposed: true, kind: service}

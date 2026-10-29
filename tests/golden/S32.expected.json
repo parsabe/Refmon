@@ -1,0 +1,33 @@
+{
+  "title": "Program launched from removable media connects out and creates a startup entry",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "fetch",
+    "persist"
+  ],
+  "known_gap": false,
+  "scenario": "S32",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-3201"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-3201"
+    },
+    {
+      "type": "revert_persistence",
+      "object_of_event": "e-000004"
+    }
+  ]
+}

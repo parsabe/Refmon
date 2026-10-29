@@ -1,0 +1,25 @@
+{
+  "title": "Server returns oversized responses to one client (memory-leak stage stand-in)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "response_anomaly"
+  ],
+  "known_gap": false,
+  "notes": "Hold at the first oversized response; the repeat to the same client turns it into a block.",
+  "scenario": "S27",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-2700"
+    }
+  ]
+}

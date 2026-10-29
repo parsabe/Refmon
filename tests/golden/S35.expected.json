@@ -1,0 +1,29 @@
+{
+  "title": "User opens a file downloaded from a link, it starts a hidden script that fetches more code",
+  "kind": "malicious",
+  "platform": "endpoint",
+  "decision": "block",
+  "rule_decision": "block",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "origin",
+    "contract",
+    "effect"
+  ],
+  "effects": [
+    "hide",
+    "fetch"
+  ],
+  "known_gap": false,
+  "scenario": "S35",
+  "actions": [
+    {
+      "type": "kill_process_tree",
+      "process": "p-3501"
+    },
+    {
+      "type": "cut_network",
+      "process": "p-3501"
+    }
+  ]
+}

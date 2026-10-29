@@ -1,0 +1,10 @@
+{
+  "title": "Browser reads its own password store (its contract allows it)",
+  "kind": "benign",
+  "platform": "endpoint",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "known_gap": false,
+  "scenario": "S39"
+}

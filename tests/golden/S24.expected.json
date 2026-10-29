@@ -1,0 +1,17 @@
+{
+  "title": "Admin deploys new site version via deployment tool",
+  "kind": "benign",
+  "platform": "server",
+  "decision": "allow",
+  "rule_decision": "allow",
+  "decided_in_phase": "1",
+  "questions_failed": [
+    "effect"
+  ],
+  "effects": [
+    "persist"
+  ],
+  "override": "trusted_root",
+  "known_gap": false,
+  "scenario": "S24"
+}

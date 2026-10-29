@@ -1,0 +1,15 @@
+{
+  "scenario": "S13",
+  "title": "Inbound request -> web worker spawns shell (RCE stand-in)",
+  "kind": "malicious",
+  "platform": "server",
+  "decision": "block",
+  "rule_decision": "block",
+  "questions_failed": ["origin", "contract", "effect"],
+  "effects": ["fetch"],
+  "actions": [
+    { "type": "kill_process_tree", "process": "p-1842" },
+    { "type": "cut_network", "process": "p-1843" }
+  ],
+  "notes": "The worker carries the request label for the duration of the request, so it is the containment root; the spawned process p-1843 made the outbound connection."
+}
