@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the reproduction replays the tags v1.0 to v1.3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+      - name: Test
+        run: pytest
+      - name: Privacy audit
+        run: python -m refmon.audit tests/golden
+      - name: Robustness matrix
+        run: python -m refmon.variants --golden tests/golden --out build/robustness-matrix.csv
+      - name: Publishability (secrets, personal data, raw content)
+        run: python scripts/check_publishable.py
+      - name: Reproduce every result table
+        run: python scripts/reproduce.py --skip-tests && git diff --stat docs/
+      - name: Upload the matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robustness-matrix
+          path: build/
+
