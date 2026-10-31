@@ -518,6 +518,18 @@ class LiveBarrier:
                 raw_events.append(
                     raw(EventType.NET_CONNECT, "net_endpoint", f"{proc_id}@{host}", host=host)
                 )
+            if intent.exfil:
+                # v2.0: the command sends the home directory or the root to a host. Its size is not
+                # known before it runs, so the barrier states the volume at which the policy's
+                # counted detector calls a window exfil (rates.exfil_bytes for the role).
+                volume = self.policy.rates.exfil_bytes_by_role.get(
+                    role, self.policy.rates.exfil_bytes
+                )
+                target = hosts[0] if hosts else "remote-host"
+                raw_events.append(
+                    raw(EventType.NET_CONNECT, "net_endpoint", f"{proc_id}@{target}#bulk",
+                        host=target, bytes=float(volume))
+                )  # fmt: skip
             if intent.secret == "canary":
                 raw_events.append(
                     raw(EventType.ASSET_ACCESS, "credential_store", _CANARY_CRED,

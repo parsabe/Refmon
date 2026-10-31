@@ -26,6 +26,15 @@ shell, which ran the external text but is the user's session (its labeled childr
 they appear, as before). Until v1.5 such a block acted on no producer at all, waiting for a labeled
 child that never appears when the label sits on content only a channel role touched (channel roles
 never carry labels): a hold that timed out into a block then acted on nothing (F11).
+
+v2.0 (A66): a channel role relays, it does not act. When a producer of the story's signals is a
+channel role that ran an exec in the story, the fallback reaches the programs that producer started
+inside the story (its children among the story's processes, with their trees) instead of reaching
+nobody; a channel role that acted itself (connected, wrote) without starting anything leaves its
+other children alone. Until v1.7 a
+hold whose only producer was a channel role (a run dialog that ran an obfuscated command whose
+program then did the rest) paused nothing. The channel role itself is still never touched, and the
+user's interactive shell is still spared where A63 spares it.
 """
 
 from __future__ import annotations
@@ -76,14 +85,23 @@ class Contain:
     ) -> list[str]:
         """The producers that may be touched when nothing is labeled: not a channel role, and
         with `spare_session` not the user's interactive shell (A63)."""
-        known, channel = set(rec.story.process_ids), set(self.tagger.policy.non_carrier_roles)
-        if spare_session:
-            channel.add("interactive_shell")
-        return [
-            p
-            for p in producers
-            if p in known and p in self.tagger.procs and self.tagger.procs[p].role not in channel
-        ]
+        procs = self.tagger.procs
+        known = [p for p in rec.story.process_ids if p in procs]
+        relays = set(self.tagger.policy.non_carrier_roles)
+        spared = relays | ({"interactive_shell"} if spare_session else set())
+        started = {e.actor.id for e in rec.events if e.type is EventType.EXEC}
+        out: list[str] = []
+        for p in producers:
+            if p not in procs or p not in known:
+                continue
+            if procs[p].role in relays:
+                if p in started:  # v2.0 (A66): the programs the relay started act, not the relay
+                    out += [
+                        c for c in known if procs[c].parent == p and procs[c].role not in spared
+                    ]
+            elif procs[p].role not in spared:
+                out.append(p)
+        return list(dict.fromkeys(out))
 
     def roots(self, rec: StoryRecord, within: list[str] | None = None) -> list[str]:
         members = self.labeled_processes(rec) if within is None else within

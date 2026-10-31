@@ -7,3 +7,10 @@ __pycache__/
 dist/
 build/
 build/
+
+# LaTeX build files (the compiled main.pdf is kept)
+documentation/*.aux
+documentation/*.log
+documentation/*.out
+documentation/*.toc
+documentation/*.lof

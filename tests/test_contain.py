@@ -169,6 +169,14 @@ def test_contain_never_touches_an_unlabeled_object(stream):
     } | {p for rec in pipe.linker.records.values() for p in rec.flag_processes}
     channel = set(pipe.policy.non_carrier_roles)
     role_of = {e.actor.id: e.actor.role for e in events}
+    # v2.0 (A66): a channel role that produced a signal and started a program hands the fallback
+    # to the programs it started
+    started = {e.actor.id for e in events if e.type.value == "exec"}
+    parent_of = {e.actor.id: e.actor.parent for e in events}
+    producers |= {
+        c for c, par in parent_of.items()
+        if par in producers and par in started and role_of.get(par) in channel
+    }  # fmt: skip
     written_by = {
         e.object.fingerprint
         for e in events

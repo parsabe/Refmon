@@ -18,8 +18,10 @@ gaps:
       Seed 545728926 (v1.6): the same holds for S07 and S25 with typed delivery or a launcher
       entry; the connecting process has no external lineage at all, so v1.5's lineage rule (A60)
       does not reach it.
+      Seed 171139148 (v2.0): also S05, a command typed by hand (no origin label at all, the known
+      gap of the catalog) whose connection goes to the trusted class; nothing fails.
     match: {destination: popular_trusted}
-    scenarios: [S07, S13, S18, S25]
+    scenarios: [S05, S07, S13, S18, S25]
   - id: G2
     finding: F3
     reason: >
@@ -47,4 +49,14 @@ gaps:
       `effect_response_anomaly` per story (L = -5.41, below the hold threshold). CUSUM covers volume
       only, not this per-client repeat.
     match: {timing: beyond_window}
+    scenarios: [S27]
+  - id: G5
+    finding: F3
+    reason: >
+      Slow leak with the oversized responses of S27 minutes apart but inside the story quiet window
+      (seed 171139148, v2.0: gap 508 s). The story keeps Origin and Effect, but the request label has
+      faded, so Origin counts at its decayed strength (C11.4) and L = -4.96, 0.02 nats under the hold
+      threshold (-4.94); the repeat test does not fire for responses this far apart. Moving a weight
+      or a threshold for it would fit the rule to this seed (C11, weight methodology).
+    match: {timing: minutes}
     scenarios: [S27]

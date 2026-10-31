@@ -261,3 +261,24 @@ version alike). Still open: F2 for processes with no external lineage (G1, a pol
 The live command barrier now predicts behaviour from the command text (`src/refmon/intent.py`):
 23 attacker behaviours are refused when typed and blocked when pasted, 23 benign look-alikes stay
 allowed (`tests/test_intent.py`).
+
+## v2.0 (seed 171139148)
+
+Results are in docs/v2.0-evaluation.md, and the seed was recorded before any v2.0 code.
+
+Changes:
+- **A65 (F10):** trust from a trusted root source is lineage. It is carried by the ingesting
+  process and its children and fades like a label. It is narrower than a label: a channel role that
+  ingests trusted content does not acquire it, it never passes to files, and any live external
+  label in the lineage cancels it.
+- **A66:** a fallback that reaches a channel role which started a program acts on that program.
+- **A67:** the live barrier undoes the shell's word-hiding and recognises six more behaviours.
+
+Results on the new seed:
+- neutral false block rate 1.3 % → **0.0 %** (0 of 158, Wilson [0.0, 2.4]);
+- false holds 3 → 0, and no benign variant ends worse than its unmodified file;
+- 98.4 % of malicious variants contained in both versions, with none changed.
+
+New allowed variants were documented, not fixed: S05 is now listed under G1, and S27 with minutes
+between responses is G5, 0.02 nats under the hold threshold. F10 is closed. Still open: G1 (a
+policy decision) and F3 (needs a pilot baseline).

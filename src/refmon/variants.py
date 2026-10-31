@@ -45,7 +45,7 @@ from .policy import Policy, default_policy
 from .replay import ReplaySource
 from .schemas import Action, ActionType, Decision, Event, EventType
 
-SEED = 616687759  # active seed; earlier seeds are retired, see docs/variant-seeds.md
+SEED = 171139148  # active seed; earlier seeds are retired, see docs/variant-seeds.md
 
 DIMENSIONS: dict[str, list[str]] = {
     "delivery": ["typed", "dragged", "opened", "inbound_request"],

@@ -13,6 +13,16 @@
 7. A persistent label carries the Contract signals of the story that created it (contract_evidence).
    v1.1 (A49): a label of any kind that has seen Contract signals carries them, and a label that
    carries Contract evidence does not decay (it keeps the strength it had when it got them).
+
+v2.0 (A65): trust is lineage too. A process that ingests content from a trusted root source carries
+a trust mark, its children inherit it (rule 4), and the mark fades with the half-life and dies under
+the alive floor exactly as a label does, so trusted and external provenance outlive the story quiet
+window alike. Until v1.7 trust was a property of one story only: a later step of the same install,
+further away than the quiet window, was judged as if nothing had been installed. The mark is
+narrower than a label on purpose: a channel role that ingests trusted content does not acquire
+it, it never passes to files or persistence items, and it counts only while the process's lineage
+carries no live external label (a single external label cancels it). The overrides that block
+(canary, protected asset, tampering with Refmon) still come first in Judge.
 """
 
 from __future__ import annotations
@@ -45,6 +55,7 @@ class _Proc:
     # shell is part of the story even once the request is over.
     ever: set[str] = field(default_factory=set)
     last: float = 0.0  # time of the process's latest event (seconds), for forgetting (A62)
+    trusted_at: float | None = None  # v2.0 (A65): when its lineage ingested trusted content
 
 
 class Tagger:
@@ -69,6 +80,17 @@ class Tagger:
 
     def combined(self, label_ids, ts) -> float:
         return noisy_or(self.strength(i, ts) for i in label_ids)
+
+    def trust_alive(self, proc: _Proc, ts) -> bool:
+        """v2.0 (A65): the trust mark of a process is live: it fades like a non-persistent label
+        created at the same time, and any live external label in the lineage cancels it."""
+        if proc.trusted_at is None or self.alive(proc.ever | proc.labels, ts):
+            return False
+        return self._trust_strength(proc, ts) >= self.policy.thresholds.label_alive_floor
+
+    def _trust_strength(self, proc: _Proc, ts) -> float:
+        age = ts.timestamp() - (proc.trusted_at or 0.0)
+        return decay(1.0, age, self.policy.thresholds.decay_half_life)
 
     def alive(self, label_ids, ts) -> tuple[str, ...]:
         floor = self.policy.thresholds.label_alive_floor
@@ -115,16 +137,18 @@ class Tagger:
         have no remaining child, and labels that are dead (under the alive floor, not persistent,
         no Contract evidence) and not named by a story still kept."""
         cutoff = now.timestamp() - older_than
+        floor = self.policy.thresholds.label_alive_floor
         idle = {
             pid
             for pid, p in self.procs.items()
-            if p.last < cutoff and not self.alive(p.ever | p.labels, now)
+            if p.last < cutoff
+            and not self.alive(p.ever | p.labels, now)
+            and not (p.trusted_at is not None and self._trust_strength(p, now) >= floor)
         }
         parents = {p.parent for pid, p in self.procs.items() if pid not in idle}
         for pid in idle - parents:
             del self.procs[pid]
             self.pending.pop(pid, None)
-        floor = self.policy.thresholds.label_alive_floor
         dead = {
             lid
             for lid, lab in self.labels.items()
@@ -157,14 +181,17 @@ class Tagger:
         first = pid not in self.procs
         if first:
             inherited = set()
+            trusted_at = None
             parent = ev.actor.parent
             if parent in self.procs:  # rule 4
                 inherited |= self.procs[parent].labels
+                trusted_at = self.procs[parent].trusted_at  # A65: the trust mark too
             if parent in self.pending:  # rule 3
                 inherited |= self.pending.pop(parent)
             self.procs[pid] = _Proc(
-                parent=parent, role=ev.actor.role, labels=set(inherited), ever=set(inherited)
-            )
+                parent=parent, role=ev.actor.role, labels=set(inherited), ever=set(inherited),
+                trusted_at=trusted_at,
+            )  # fmt: skip
         proc = self.procs[pid]
         proc.last = ts.timestamp()
         fp = ev.object.fingerprint
@@ -175,6 +202,8 @@ class Tagger:
             source = ev.attrs.get("source_class")
             if "trusted_source" in ev.attrs:  # rule 6: trusted sources create no label
                 trusted = True
+                if ev.actor.role not in self.policy.non_carrier_roles:  # A65, as rule 2
+                    proc.trusted_at = ts.timestamp()
             elif source in EXTERNAL_SOURCES and fp is not None:  # rule 1
                 labels = self._labels_for(fp, source, ts, new)
                 if ev.actor.role not in self.policy.non_carrier_roles:  # rule 2
@@ -198,6 +227,7 @@ class Tagger:
             self.written_by[fp] = pid
 
         actor_labels = self.alive(proc.labels, ts)
+        trusted = trusted or self.trust_alive(proc, ts)  # A65
         object_labels = self.alive(self.fp_labels.get(fp, ()), ts) if fp is not None else ()
         return Tagged(ev, actor_labels, object_labels, tuple(new), trusted, first)
 
