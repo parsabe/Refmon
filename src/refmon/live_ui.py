@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Self-contained HTML/CSS/JS live visual interface for the Refmon barrier daemon.
 
 No external CDN links or third-party assets are loaded so the dashboard works offline on

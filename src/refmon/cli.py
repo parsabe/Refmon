@@ -9,6 +9,8 @@
     refmon apply POLICY PROPOSAL OUT KEYFILE   apply an approved proposal and sign the result
     refmon audit [GOLDEN_DIR]                  run the privacy audit
     refmon scan-rootkit [--json]               run read-only multi-engine rootkit scanners
+    refmon serve [--port PORT] [--workdir DIR] start live background barrier & web dashboard
+    refmon guard [OPTS] -- COMMAND...          intercept and enforce policy on a command
 
 Nothing here runs unattended: a person holds the key and names themselves as approver.
 """
@@ -73,6 +75,23 @@ def main(argv: list[str] | None = None) -> int:
     rk.add_argument("--passes", type=int, default=2)
     rk.add_argument("--interval-ms", type=float, default=50.0)
     rk.add_argument("--with-external", action="store_true")
+    srv = sub.add_parser("serve")
+    srv.add_argument("--host", default="127.0.0.1")
+    srv.add_argument("--port", type=int, default=8765)
+    srv.add_argument("--workdir", default=None)
+    grd = sub.add_parser("guard")
+    grd.add_argument("--host", default="localhost")
+    grd.add_argument("--port", type=int, default=8765)
+    grd.add_argument("--workdir", default=None)
+    grd.add_argument(
+        "--origin",
+        default="web",
+        choices=("web", "mail", "agent_input", "inbound_request", "download", "none"),
+    )
+    grd.add_argument("--role", default="interactive_shell")
+    grd.add_argument("--no-exec", action="store_true")
+    grd.add_argument("--json", action="store_true", dest="as_json")
+    grd.add_argument("cmd_parts", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
     try:
@@ -147,6 +166,43 @@ def _run(args: argparse.Namespace) -> int:
         else:
             print(format_scan_report(report))
         return 0 if report.calculus_decision is Decision.ALLOW else 1
+    elif args.command == "serve":
+        from .live import serve_forever
+
+        return serve_forever(host=args.host, port=args.port, workdir=args.workdir)
+    elif args.command == "guard":
+        import json
+        import shlex
+
+        from .live import send_guard_request
+
+        parts = list(args.cmd_parts)
+        if parts and parts[0] == "--":
+            parts = parts[1:]
+        command_str = parts[0] if len(parts) == 1 else shlex.join(parts)
+        if not command_str.strip():
+            raise ValueError("guard requires a command after --")
+        res = send_guard_request(
+            command_str,
+            host=args.host,
+            port=args.port,
+            origin=args.origin,
+            role=args.role,
+            execute=not args.no_exec,
+            workdir=args.workdir,
+        )
+        if args.as_json:
+            print(json.dumps(res, indent=2))
+        else:
+            verdict = str(res["decision"]).upper()
+            print(
+                f"[Refmon Barrier: {verdict}] mode={res['mode']} "
+                f"log_odds={res['log_odds']} nats executed={res['executed']}"
+            )
+            print(f"  Why: {res['explanation']}")
+            if res.get("output"):
+                print(res["output"])
+        return 1 if res.get("blocked_by_barrier") else 0
     return 0
 
 

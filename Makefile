@@ -5,7 +5,7 @@
 #   make all          lint, tests, privacy audit, robustness matrix and the publishability check
 PY ?= .venv/bin/python
 
-.PHONY: install test lint audit matrix publishable reproduce all clean
+.PHONY: install test lint audit matrix publishable reproduce serve scan-rootkit all clean
 
 install:
 	python3 -m venv .venv
@@ -29,6 +29,12 @@ publishable:
 
 reproduce:
 	$(PY) scripts/reproduce.py
+
+serve:
+	$(PY) -m refmon.cli serve
+
+scan-rootkit:
+	$(PY) -m refmon.cli scan-rootkit
 
 all: lint test audit matrix publishable
 
