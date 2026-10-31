@@ -8,6 +8,7 @@
     refmon approve PROPOSAL --by NAME          approve a proposal (--relax: relaxing changes too)
     refmon apply POLICY PROPOSAL OUT KEYFILE   apply an approved proposal and sign the result
     refmon audit [GOLDEN_DIR]                  run the privacy audit
+    refmon scan-rootkit [--json]               run read-only multi-engine rootkit scanners
 
 Nothing here runs unattended: a person holds the key and names themselves as approver.
 """
@@ -67,6 +68,11 @@ def main(argv: list[str] | None = None) -> int:
     apply_.add_argument("proposal")
     apply_.add_argument("out")
     apply_.add_argument("keyfile")
+    rk = sub.add_parser("scan-rootkit")
+    rk.add_argument("--json", action="store_true", dest="as_json")
+    rk.add_argument("--passes", type=int, default=2)
+    rk.add_argument("--interval-ms", type=float, default=50.0)
+    rk.add_argument("--with-external", action="store_true")
 
     args = parser.parse_args(argv)
     try:
@@ -124,6 +130,23 @@ def _run(args: argparse.Namespace) -> int:
         )
         write_signed(data, _read_key(args.keyfile), args.out)
         print(f"signed policy written: {args.out}")
+    elif args.command == "scan-rootkit":
+        import json
+
+        from .rootkit import ScanConfig, evaluate_rootkit_scan, format_scan_report
+        from .schemas import Decision
+
+        cfg = ScanConfig(
+            passes=max(1, args.passes),
+            pass_interval_s=max(0.0, args.interval_ms / 1000.0),
+            run_external=args.with_external,
+        )
+        report, _ = evaluate_rootkit_scan(cfg)
+        if args.as_json:
+            print(json.dumps(report.to_dict(), indent=2))
+        else:
+            print(format_scan_report(report))
+        return 0 if report.calculus_decision is Decision.ALLOW else 1
     return 0
 
 
