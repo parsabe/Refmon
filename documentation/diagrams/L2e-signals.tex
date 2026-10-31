@@ -1,0 +1,58 @@
+% Level 2e: signal extraction per event type (src/refmon/pipeline/signals.py). Wide figure.
+% Blue chips = Contract signals, orange = Effect signals, red = override flags.
+% U(allowance, effect) is the universal contract helper explained at the bottom.
+\begin{tikzpicture}[rm,
+    etype/.style={rm stage, minimum width=24mm, minimum height=6mm, font=\tiny\ttfamily},
+    cond/.style={rm note, font=\tiny\sffamily, align=left, text width=128mm, anchor=north west,
+                 inner sep=1.5pt},
+    rowsep/.style={draw=rmStoreLine!35, line width=0.4pt}]
+  % header
+  \node[font=\scriptsize\sffamily\bfseries, anchor=west] at (-1.2,0.45) {event type};
+  \node[font=\scriptsize\sffamily\bfseries, anchor=west] at (1.6,0.45) {condition $\to$ signal};
+
+  \node[cond] (c0) at (1.6,0.1)
+    {\texttt{threat\_list\_hit} (confirmed in Observe) $\to$ \rmE{effect\_threat\_list\_hit}; \quad
+     \texttt{canary\_hit} $\to$ flag \rmF{canary}\\
+     rare for the role, mature baseline, not listed by its contract ($I \ge 12$ bits) $\to$ \rmC{contract\_surprisal}\\
+     a learned contract whose baseline is not mature yet raises \emph{no} Contract signal (missing information)};
+  \node[cond] (c1) at ($(c0.south west)+(0,-0.16)$)
+    {labeled command text, any role unless its contract says \texttt{allow} (a \texttt{deny} role: any exec by a labeled process) $\to$ \rmC{contract\_external\_exec}\\
+     executable class not in \texttt{may\_exec} $\to$ \rmC{contract\_web\_worker\_exec} (web worker, Node app server) or \rmC{contract\_exec\_violation}\\
+     unsigned (\texttt{signed=false}) externally labeled file and the role denies it $\to$ \rmC{contract\_unsigned\_launch}\\
+     hidden window, encoded payload, entropy $H > 5.2$ bits or a long whitespace run $\to$ \rmE{effect\_hide}};
+  \node[cond] (c2) at ($(c1.south west)+(0,-0.16)$)
+    {destination class not in \texttt{may\_connect} $\to$ \rmC{contract\_connect\_violation}\\
+     not in the contract and (class not trusted \emph{or} actor labeled, A48) $\to$ \rmE{effect\_fetch}\\
+     internal class and a Poisson burst of distinct hosts $\to$ \rmU{may\_fan\_out}{effect\_lateral}\\
+     outbound bytes: CUSUM against the role's volume baseline $\to$ \rmE{effect\_exfil}};
+  \node[cond] (c3) at ($(c2.south west)+(0,-0.16)$)
+    {executable $\to$ \rmC{contract\_write\_executable}; \quad else path group not in \texttt{may\_write} $\to$ \rmC{contract\_write\_other}\\
+     new executable file in a web root $\to$ \rmE{effect\_persist}\\
+     Poisson burst of distinct files $\to$ \rmU{may\_mass\_change}{effect\_mass\_change}};
+  \node[cond] (c4) at ($(c3.south west)+(0,-0.16)$)
+    {\texttt{may\_persist: false} $\to$ \rmC{contract\_persist\_violation}; \quad always \rmE{effect\_persist}};
+  \node[cond] (c5) at ($(c4.south west)+(0,-0.16)$)
+    {not in \texttt{may\_read\_assets} $\to$ \rmC{contract\_asset\_violation} and \rmE{effect\_credential} (credential class) / \rmE{effect\_asset\_access} (protected asset)\\
+     protected asset read by a labeled actor $\to$ flag \rmF{protected\_asset}};
+  \node[cond] (c6) at ($(c5.south west)+(0,-0.16)$)
+    {\texttt{may\_change\_privilege: false} $\to$ \rmC{contract\_privilege\_violation}; \quad not \texttt{true} $\to$ \rmE{effect\_escalate}};
+  \node[cond] (c7) at ($(c6.south west)+(0,-0.16)$)
+    {object is a Refmon component $\to$ flag \rmF{self\_tamper}; \quad always \rmU{may\_tamper}{effect\_tamper}};
+  \node[cond] (c8) at ($(c7.south west)+(0,-0.16)$)
+    {repeated oversized responses to one client (Poisson) $\to$ \rmU{may\_repeat\_large\_responses}{effect\_response\_anomaly\_repeated}\\
+     a single oversized response $\to$ \rmE{effect\_response\_anomaly}};
+
+  \foreach \row/\lbl in {0/every event,1/exec,2/net\_connect,3/file\_write,4/persist,5/asset\_access,%
+                     6/priv\_change,7/security\_tamper,8/response\_out} {
+    \node[etype] (t\row) at (0,0 |- c\row) {\lbl};
+    \draw[rm flow] (t\row.east) -- (c\row.west |- t\row.east);
+    \draw[rowsep] ($(c\row.north west)+(-2.85,0.08)$) -- ($(c\row.north east)+(0,0.08)$);
+  }
+
+  % the universal contract helper
+  \node[rm sub, align=left, anchor=north west, text width=150mm] (u) at ($(c8.south west)+(-2.8,-0.3)$)
+    {\textbf{U(allowance, effect)}, the universal contract (C4): if the role's contract grants the allowance,
+     the Effect is raised as \emph{allowed} and counts only in a story with an external origin label (D23);
+     otherwise \rmC{contract\_universal\_violation} \emph{and} the Effect.
+     Every signal carries strength 1 (v1.3, A55); only Origin carries the label's strength.};
+\end{tikzpicture}

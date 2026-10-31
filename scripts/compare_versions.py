@@ -22,7 +22,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-PAUSING = ("hold", "quarantine_file")
+# a kill (a hold that timed out and was denied) contains at least as much as a pause (F12)
+PAUSING = ("hold", "quarantine_file", "kill_process_tree")
 RANK = {"allow": 0, "hold": 1, "block": 2}
 
 

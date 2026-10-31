@@ -46,7 +46,9 @@ URL = re.compile(r"https?://[A-Za-z0-9./_?=&%#:@-]+")
 OK_URL = re.compile(
     r"example\.|\.invalid|\.test\b|localhost|github\.com/actions|pypi\.org|python\.org|"
     r"claude\.(?:com|ai)|docs\.pytest|hypothesis|astral\.sh|keepachangelog|semver|json-schema|"
-    r"github\.com/(?:astral-sh|pytest|HypothesisWorks)"
+    r"github\.com/(?:astral-sh|pytest|HypothesisWorks)|"
+    # the verbatim GPL-3.0 text in LICENSE
+    r"//fsf\.org/|//www\.gnu\.org/licenses/"
 )
 # Machine and account names of the places the work was done on; filled from the environment, so
 # the script never contains them.

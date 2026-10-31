@@ -36,7 +36,17 @@ class Pipeline:
         gate: bool = False,
         notifier=None,
         baseline=None,
+        retain: float | None = None,
     ) -> None:
+        """`retain` (seconds) bounds a long-running pipeline (A62): stories quiet for longer, and
+        the processes and dead labels only they referred to, are forgotten. None (the default, used
+        by replay and evaluation) keeps everything."""
+        if retain is not None and retain < max(
+            policy.thresholds.story_quiet_window, policy.rates.long_window
+        ):
+            raise ValueError("retain must cover the story quiet window and the hour-scale window")
+        self.retain = retain
+        self._forgot_at = None  # time of the last forgetting pass
         self.policy = policy
         if policy.engine_fallback:
             _log_engine_fallback(policy)
@@ -67,7 +77,9 @@ class Pipeline:
         self.last[rec.story.story_id] = j
         if hasattr(self.rates, "mark_incident"):  # baselines stay frozen while an incident is open
             self.rates.mark_incident(
-                self.tagger.root_of(ev.actor.id), j.decision is not Decision.ALLOW
+                self.tagger.root_of(ev.actor.id),
+                j.decision is not Decision.ALLOW,
+                ev.ts.timestamp(),
             )
         persistent_new = [i for i in tg.new_labels if self.tagger.labels[i].persistent]
         if persistent_new:  # D21: remember the Contract signals of the story that made the item
@@ -85,7 +97,36 @@ class Pipeline:
         out = self._emit(rec, j)
         if self.gate is not None:
             out = [*self.gate.tick(ev.ts), *out, *self.gate.handle(rec, j, ev.ts, rec.verdict_id)]
+        if self.retain is not None and (
+            self._forgot_at is None
+            or (ev.ts - self._forgot_at).total_seconds()
+            >= self.policy.thresholds.story_quiet_window
+        ):  # at most one pass per quiet window
+            self._forgot_at = ev.ts
+            self.forget(ev.ts)
         return out
+
+    def forget(self, now) -> set[str]:
+        """Drop stories quiet for longer than `retain` (A62). Returns the forgotten story ids."""
+        if self.retain is None:
+            return set()
+        held = self.gate.open_hold_stories() if self.gate is not None else set()
+        old = {
+            sid
+            for sid, rec in self.linker.records.items()
+            if (now - rec.last_ts).total_seconds() > self.retain and sid not in held
+        }
+        for sid in old:
+            del self.linker.records[sid]
+            self.last.pop(sid, None)
+        self.linker._by_key = {k: s for k, s in self.linker._by_key.items() if s not in old}
+        if self.gate is not None:
+            self.gate.forget(old)
+        keep = set().union(*(r.label_ids for r in self.linker.records.values()))
+        self.tagger.forget(now, self.retain, keep)
+        if hasattr(self.rates, "forget"):
+            self.rates.forget(now.timestamp())
+        return old
 
     def probe(self) -> Pipeline:
         """An isolated copy of this pipeline as it is configured now, for the self-test (Phase 6).

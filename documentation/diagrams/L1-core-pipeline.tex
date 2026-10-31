@@ -1,0 +1,53 @@
+% Level 1: one call of Pipeline.process(event) (src/refmon/pipeline/pipeline.py). Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- row 1: the stages -------------------------------------------------
+  \node[rm io, minimum width=24mm] (in) at (-0.4,0) {\texttt{RawEvent} | \texttt{Event}\\\tiny from \texttt{Sensor.emit}};
+  \node[rm stage, minimum width=17mm] (obs) at (2.15,0)  {\textbf{Observe}\\\tiny fingerprint, drop raw};
+  \node[rm stage, minimum width=17mm] (tag) at (4.25,0)  {\textbf{Tag}\\\tiny rules 1--7};
+  \node[rm stage, minimum width=17mm] (sig) at (6.35,0)  {\textbf{Signals}\\\tiny \texttt{extract()}};
+  \node[rm stage, minimum width=17mm] (lnk) at (8.45,0)  {\textbf{Link}\\\tiny assign / merge story};
+  \node[rm stage, minimum width=17mm] (jdg) at (10.55,0) {\textbf{Judge}\\\tiny $\to$ \texttt{Judgement}};
+  \draw[rm flow] (in) -- (obs);
+  \draw[rm flow] (obs) -- (tag);
+  \draw[rm flow] (tag) -- (sig);
+  \draw[rm flow] (sig) -- (lnk);
+  \draw[rm flow] (lnk) -- (jdg);
+  \draw[rm wall] (3.2,-0.65) -- (3.2,0.65);
+  \node[rm note, text=rmBlockLine, below] at (3.2,-0.65) {privacy wall};
+
+  % ---- state the stages share ---------------------------------------------
+  \node[rm store] (buf) at (2.15,1.75) {Ring buffer\\\tiny Events only};
+  \node[rm store] (tst) at (4.25,1.75) {Tagger state\\\tiny labels, procs};
+  \node[rm store] (rts) at (6.35,1.75) {Rates\\\tiny windows, EMA};
+  \draw[rm ctrl] (obs) -- (buf);
+  \draw[rm ctrl, <->] (tag) -- (tst);
+  \draw[rm ctrl] (rts) -- (sig);
+
+  % ---- row 2: after the judgement ----------------------------------------
+  \node[rm box] (inc) at (10.9,-1.9) {\texttt{rates.mark\_incident}\\\tiny freeze baselines while $D\neq$ allow};
+  \node[rm box] (evd) at (7.6,-1.9)  {\texttt{tagger.set\_evidence}\\\tiny labels behind a Contract\\\tiny signal stop decaying (D21, A49)};
+  \node[rm dec] (emd) at (4.75,-1.9) {decision\\changed and\\$\neq$ ALLOW?};
+  \node[rm box] (vrd) at (1.75,-1.9) {emit \texttt{Verdict}\\\tiny contributions, $L$, threshold, gate};
+  \draw[rm flow] (jdg.south) -- (jdg.south |- inc.north);
+  \draw[rm flow] (inc) -- (evd);
+  \draw[rm flow] (evd) -- (emd);
+  \draw[rm flow] (emd) -- node[rm yes, above] {yes} (vrd);
+
+  % feedback loops into shared state
+  \draw[rm back] (evd.north) |- (5.3,-1.0) |- (tst.east);
+  \node[rm note, text=rmStageLine, anchor=west] at (5.35,-0.75) {labels frozen};
+  \draw[rm back] (inc.east) -- ++(0.35,0) |- (rts.east);
+  \node[rm note, text=rmStageLine, anchor=south east] at (12.5,1.75) {baselines frozen};
+
+  % ---- row 3: the Gate ----------------------------------------------------
+  \node[rm dec] (gq)   at (4.75,-3.75) {Gate\\enabled?};
+  \node[rm box] (tick) at (7.6,-3.75)  {\texttt{Gate.tick(ts)}\\\tiny resolve expired holds};
+  \node[rm box] (hnd)  at (10.9,-3.75) {\texttt{Gate.handle}\\\tiny hold / block via \texttt{Contain.plan}};
+  \node[rm term] (ret) at (4.75,-5.15) {return \texttt{[*tick, *verdicts, *actions]}};
+  \draw[rm flow] (emd) -- node[rm no, right] {no} (gq);
+  \draw[rm flow] (vrd.south) |- (gq.west);
+  \draw[rm flow] (gq) -- node[rm yes, above] {yes} (tick);
+  \draw[rm flow] (tick) -- (hnd);
+  \draw[rm flow] (gq) -- node[rm no, right] {no} (ret);
+  \draw[rm flow] (hnd.south) |- (ret.east);
+\end{tikzpicture}

@@ -1,0 +1,59 @@
+% Level 2b (detail): label strength over time (C11.1, A49) and the v1.3 monotonicity fix (F8, A55).
+% Two small plots side by side. Wide figure.
+\begin{tikzpicture}[rm]
+  % ======================= (a) strength over time ==========================
+  % x: 0.06 cm per minute (0..120 min); y: 3 cm = strength 1
+  \draw[->] (0,0) -- (7.6,0) node[right, rm note] {$\Delta t$ (min)};
+  \draw[->] (0,0) -- (0,3.4) node[above, rm note] {$s(t)$};
+  \foreach \m in {0,30,60,90,120} {
+    \draw (0.06*\m,0) -- ++(0,-0.07) node[below, rm note] {\m};
+  }
+  \foreach \pp/\lab in {0/0,1.5/0.5,3/1} {
+    \draw (0,\pp) -- ++(-0.07,0) node[left, rm note] {\lab};
+  }
+  % origin threshold theta = 0.5
+  \draw[densely dashed, rmDecideLine] (0,1.5) -- (7.4,1.5)
+    node[pos=0.97, above, rm note, text=rmDecideLine] {$\theta_{ori}=0.5$};
+  % persistent label: never decays
+  \draw[very thick, rmAllowLine] (0,3) -- (7.2,3)
+    node[pos=0.72, above, rm note, text=rmAllowLine] {persistent (web root, \texttt{persist})};
+  % ordinary label: s0 * 2^(-t/30)
+  \draw[very thick, rmStageLine, domain=0:120, samples=60, smooth]
+    plot ({0.06*\x},{3*exp(-0.693147*\x/30)});
+  \node[rm note, text=rmStageLine, anchor=west] at (4.6,0.95) {ordinary: $s_0\,2^{-\Delta t/T_{1/2}}$};
+  % evidence-carrying label: decays until a Contract signal at t=20, then frozen (A49)
+  \draw[very thick, rmHoldLine, densely dashed, domain=0:20, samples=20, smooth]
+    plot ({0.06*\x},{3*exp(-0.693147*\x/30)});
+  \draw[very thick, rmHoldLine] (1.2,1.89) -- (7.2,1.89)
+    node[pos=0.72, above, rm note, text=rmHoldLine] {Contract evidence: frozen at 0.63 (A49)};
+  \fill[rmHoldLine] (1.2,1.89) circle (1.6pt);
+  % where the ordinary label stops failing Origin
+  \fill[rmStageLine] (1.8,1.5) circle (1.6pt);
+  \draw[rm note, ->] (2.6,0.95) node[below, rm note] {Origin passes from here} -- (1.85,1.43);
+  \node[rm note, font=\scriptsize\sffamily\bfseries, anchor=north west] at (0,-0.55) {(a) label strength over time};
+
+  % ======================= (b) F8: contribution vs label strength ===========
+  \begin{scope}[xshift=9.4cm]
+    % x: 4 cm = s_ori 1; y: 3 cm = contribution w_j
+    \draw[->] (0,0) -- (4.5,0) node[right, rm note] {$s_{ori}$};
+    \draw[->] (0,0) -- (0,3.4) node[above, rm note] {Contract / Effect contribution};
+    \foreach \pp/\lab in {0/0,2/0.5,4/1} {
+      \draw (\pp,0) -- ++(0,-0.07) node[below, rm note] {\lab};
+    }
+    \draw (0,0)   -- ++(-0.07,0) node[left, rm note] {$0$};
+    \draw (0,1.5) -- ++(-0.07,0) node[left, rm note] {$w_j/2$};
+    \draw (0,3)   -- ++(-0.07,0) node[left, rm note] {$w_j$};
+    \draw[densely dashed, rmDecideLine] (2,0) -- (2,3.2);
+    % up to v1.2: full strength below theta, label strength above it
+    \draw[very thick, rmBlockLine] (0,2.93) -- (2,2.93);
+    \draw[very thick, rmBlockLine] (2,1.5) -- (4,2.93);
+    \draw[rmBlockLine, densely dotted] (2,2.93) -- (2,1.5);
+    \fill[rmBlockLine] (2,1.5) circle (1.6pt);
+    \draw[rmBlockLine, fill=white] (2,2.93) circle (1.6pt);
+    \node[rm note, text=rmBlockLine, anchor=north west] at (2.1,1.4) {$\le$\,v1.2: drop at $\theta$,\\weaker label $\Rightarrow$ more evidence};
+    % v1.3: always full strength
+    \draw[very thick, rmAllowLine] (0,3.07) -- (4,3.07)
+      node[pos=0.5, above, rm note, text=rmAllowLine] {v1.3 (A55): $s_j=1$, monotone};
+    \node[rm note, font=\scriptsize\sffamily\bfseries, anchor=north west] at (0,-0.55) {(b) the F8 fix};
+  \end{scope}
+\end{tikzpicture}

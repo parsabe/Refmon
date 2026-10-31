@@ -12,9 +12,14 @@ gaps:
       request label has decayed to nothing before the connection is made (no Contract evidence ever
       froze it), or the entry role was changed to a channel role (a launcher), which never carries a
       label and has no exec contract. Nothing is left to fail. The answer is a narrow list of trusted
-      classes, not a rule.
+      classes, not a rule. S18 (seed 711829743, with timing beyond the window): the fan-out goes to the
+      trusted class, so it is neither a fetch (the actor lost its label) nor `lateral` (which counts
+      internal classes only).
+      Seed 545728926 (v1.6): the same holds for S07 and S25 with typed delivery or a launcher
+      entry; the connecting process has no external lineage at all, so v1.5's lineage rule (A60)
+      does not reach it.
     match: {destination: popular_trusted}
-    scenarios: [S07, S13, S25]
+    scenarios: [S07, S13, S18, S25]
   - id: G2
     finding: F3
     reason: >
@@ -32,3 +37,14 @@ gaps:
       Contract evidence ever arises to keep the label alive).
     match: {timing: beyond_window}
     scenarios: [S19]
+  - id: G4
+    finding: F3
+    reason: >
+      Slow leak (seeds 711829743 and 616687759): the oversized responses of S27 are more than the
+      story quiet window apart. Each lands in a story of its own, the request label has decayed
+      below the origin threshold by the first one, and at most two responses share the hour-scale
+      window, which is not significant under the repeat test. What is left is a single
+      `effect_response_anomaly` per story (L = -5.41, below the hold threshold). CUSUM covers volume
+      only, not this per-client repeat.
+    match: {timing: beyond_window}
+    scenarios: [S27]

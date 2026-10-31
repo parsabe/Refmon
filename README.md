@@ -78,6 +78,11 @@ and no network. A run takes a few minutes.
 Command line: `refmon keygen | init-policy | sign | verify | learn | approve | apply`, and
 `python -m refmon.audit tests/golden` for the privacy audit.
 
+`refmon serve` starts the live user-space barrier and dashboard; it prints a dashboard link that
+carries the API token (kept in its private work directory), and every API call needs it.
+`refmon guard -- CMD` judges a command before it runs (`src/refmon/intent.py`) and refuses it on a
+hold or block in block mode.
+
 ## Versions
 
 `v1.0` is the state after Phase 7 and stays frozen; each later tag changes structural rules in

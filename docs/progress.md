@@ -234,3 +234,30 @@ Deviations: none. Open questions: none blocking; before publishing see docs/resu
 - `scripts/check_publishable.py` (`make publishable`) scans the tracked files and the history of every ref for secrets, personal data and raw content, and checks that every replay file is a post-Observe event stream. The content is clean; the only personal data is the git author and committer identity of the commits, which is reported for the owner to decide.
 - Phase 8 was not run: `docs/phase-8-plan.md` says why and what it needs (A58).
 - Nothing was pushed.
+
+## v1.4 in progress (seed 711829743): state of the suite
+
+The v1.4 change (A59: a derived label that becomes persistent is frozen at the strength it has then, `pipeline/tag.py`) is in the code and seed 711829743 is active, but the v1.4 evaluation has not been run or written up. On this seed the matrix allows 14 malicious variants. Eleven fall under G1 to G3 as before. Three are new instances of documented findings and are now listed in `tests/variants/known_gaps.yaml`; no rule or weight was changed:
+
+- S18 combo-3 and combo-11 (G1, F2): fan-out to a trusted class 15 to 22 minutes after the request. The actor has lost its label, so the trusted class excuses the connection, and `lateral` counts internal classes only.
+- S27 timing=beyond_window (new G4, F3): oversized responses 30 minutes apart. Each is its own story, the label is below the origin threshold, and at most two share the hour window, so the repeat test never fires (L = -5.41 per story).
+
+Not repairable in this clone: the history was squashed and the tags `v1.0` to `v1.3` exist neither here nor on the remote, so `make reproduce`, the CI reproduction step and `tests/test_reproduce.py::test_the_tags_the_reproduction_needs_exist` fail until the tags are restored from the original repository. The LICENSE (GPL-3.0) URLs are now allowlisted in `scripts/check_publishable.py`.
+
+Security fixes to the live daemon (`src/refmon/live.py`, tests in `tests/test_live.py`): the HTTP API of `refmon serve` was unauthenticated, so any user of a shared node could run commands through `/api/guard` (with `execute`) or switch the barrier off through `/api/mode`; every `/api/` call now needs a random per-daemon token (`<workdir>/api.token`), a non-local `Host` header is refused, and a client whose request is refused no longer falls back to running the command in-process. The work directory (default `/tmp/refmon-live-<uid>`) is created `0700` and refused when it is a symlink or belongs to another user. The Observe key of the daemon was derived from the work-directory path, and `refmon scan-rootkit` used the constant default key, which made their fingerprints reversible; both now use random keys (`<workdir>/device.key`, `0600`; a fresh key per scan).
+
+## v1.5 to v1.7 (seeds 833754500, 545728926, 616687759)
+
+Two rounds, each on a seed recorded before its code (docs/variant-seeds.md); results in
+docs/v1.5-evaluation.md. v1.5: lineage-aware trust (A60, F2), incidents that end (A61), bounded
+state for the live daemon (A62). v1.6: a labeled block with no labeled process acts on its producers
+(A63, F11). v1.7: every live label of reused content is handed over, which restores the
+monotonicity property a randomised test had broken (A64). Contained malicious variants: 99.1 % (v1.5, seed 833754500) 98.1 % (v1.6, seed
+545728926) and 98.3 % (v1.7, seed 616687759), neutral false block rate 0.6 to 1.9 %; no benign variant changed. New findings: **F11**
+(fixed in v1.6) and **F12** (the matrix did not count a kill as containment; corrected for every
+version alike). Still open: F2 for processes with no external lineage (G1, a policy decision) and F3
+(G2, G3, needs a pilot baseline).
+
+The live command barrier now predicts behaviour from the command text (`src/refmon/intent.py`):
+23 attacker behaviours are refused when typed and blocked when pasted, 23 benign look-alikes stay
+allowed (`tests/test_intent.py`).

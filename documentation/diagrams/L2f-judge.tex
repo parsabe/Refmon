@@ -1,0 +1,51 @@
+% Level 2f: Judge (src/refmon/pipeline/judge.py, calculus/evidence.py). Tall figure.
+\begin{tikzpicture}[rm]
+  \node[rm io, minimum width=30mm] (n1) at (0,0) {\texttt{StoryRecord} at $t = t_{last}$};
+  \node[rm box] (n2) at (0,-1.2) {$s_{ori}=\max_{\ell\in\text{story}} s_\ell(t)$\\labeled $\Leftrightarrow s_{ori}\ge\theta_{ori}=0.5$};
+  \node[rm dec] (n3) at (0,-2.65) {Effect allowed\\by contract and\\story unlabeled?};
+  \node[rm box] (drop) at (4.3,-2.65) {ignore that Effect\\\tiny in role, nothing external (D23)};
+  \node[rm box] (n4) at (0,-4.05) {+ Contract evidence carried by persistent or\\evidence labels with $s\ge\theta_{ori}$ (D21)};
+  \node[rm box] (n5) at (0,-5.2)  {remove signals of disabled rules and of\\in-scope, unexpired exceptions};
+  \node[rm dec] (n6) at (0,-6.5)  {override\\flag?};
+  \node[rm box, align=left] (ovr) at (4.3,-6.5) {self-tamper $\succ$ canary $\succ$\\protected asset $\Rightarrow$ BLOCK\\trusted root, unlabeled $\Rightarrow$ ALLOW};
+  \node[rm term] (frc) at (8.3,-6.5) {forced decision\\\tiny thresholds bypassed};
+  \node[rm box] (n7) at (0,-7.9) {failed: Origin = labeled, Contract = any C, Effect = any E\\
+                                  \texttt{rule\_decision}: 3 $\to$ block, 2 $\to$ hold, 0--1 $\to$ allow};
+  \node[rm dec] (n8) at (0,-9.25) {weights\\configured?};
+  \node[rm box] (fb) at (4.3,-9.25) {decision = rule decision\\\tiny fallback (A28); heartbeat: degraded};
+  \node[rm sub] (n9) at (0,-10.55) {$L = L_0 + \sum_{q\in\{O,C,E\}} \max_{j\in q} w_j s_j$\\[1pt]
+                                     \tiny $L_0=\ln\frac{\pi}{1-\pi}=-6.91$, contributions listed in nats};
+  \node[rm dec] (n10) at (0,-12.0) {$L\ge\tau_b$?\\$(-3.91)$};
+  \node[rm dec] (n11) at (4.3,-12.0) {Contract\\signal?};
+  \node[rm block] (blk) at (8.3,-12.0) {BLOCK};
+  \node[rm hold] (hg) at (8.3,-12.95) {HOLD \mdseries\tiny(contract gate)};
+  \node[rm dec] (n12) at (0,-13.65) {$L\ge\tau_h$?\\$(-4.94)$};
+  \node[rm hold] (hd) at (4.3,-13.65) {HOLD};
+  \node[rm allow] (alw) at (0,-15.0) {ALLOW};
+
+  \draw[rm flow] (n1) -- (n2);
+  \draw[rm flow] (n2) -- (n3);
+  \draw[rm flow] (n3) -- node[rm yes, above] {yes} (drop);
+  \draw[rm flow] (n3) -- node[rm no, right] {no} (n4);
+  \draw[rm flow] (drop.south) |- ($(n4.north)+(0,0.22)$);
+  \draw[rm flow] (n4) -- (n5);
+  \draw[rm flow] (n5) -- (n6);
+  \draw[rm flow] (n6) -- node[rm yes, above] {yes} (ovr);
+  \draw[rm flow] (ovr) -- (frc);
+  \draw[rm flow] (n6) -- node[rm no, right] {no} (n7);
+  \draw[rm flow] (n7) -- (n8);
+  \draw[rm flow] (n8) -- node[rm no, above] {no} (fb);
+  \draw[rm flow] (n8) -- node[rm yes, right] {yes} (n9);
+  \draw[rm flow] (n9) -- (n10);
+  \draw[rm flow] (n10) -- node[rm yes, above] {yes} (n11);
+  \draw[rm flow] (n11) -- node[rm yes, above] {yes} (blk);
+  \draw[rm flow] (n11.south) |- node[rm no, left, pos=0.3] {no} (hg.west);
+  \draw[rm flow] (n10) -- node[rm no, right] {no} (n12);
+  \draw[rm flow] (n12) -- node[rm yes, above] {yes} (hd);
+  \draw[rm flow] (n12) -- node[rm no, right] {no} (alw);
+
+  \node[rm note, align=left, anchor=west, text width=62mm] at (1.3,-15.0)
+    {mode of the story = strongest mode among the rules that fired (observe $<$ warn $<$ block);
+     an override uses the global mode. Thresholds: $\tau_b=\ln\frac{C_{fb}}{C_{miss}}$,
+     $\tau_h=\ln\frac{C_{hold}}{h\,C_{miss}}$.};
+\end{tikzpicture}

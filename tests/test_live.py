@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -149,6 +150,22 @@ def test_privacy_ledger_never_stores_raw_command_content(tmp_path: Path) -> None
         assert ev.object.fingerprint.startswith("hmac:")
 
 
+def test_full_16_scenario_attack_and_benign_suite_matches_expected(tmp_path: Path) -> None:
+    barrier = LiveBarrier(workdir=tmp_path)
+    suite = barrier.run_all_presets()
+    assert suite["total"] == 16
+    assert suite["failed"] == 0, suite["results"]
+    assert suite["passed"] == 16
+
+    snap = barrier.state_snapshot()
+    assert snap["counts"]["evaluated"] == 16
+    assert snap["counts"]["eval_passed"] == 16
+    for story in snap["stories"]:
+        assert story["attack_type"]
+        assert story["analysis_passed"] is True
+        assert all(fp.startswith("hmac:") for fp in story["fingerprints"])
+
+
 def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
     barrier = LiveBarrier(workdir=tmp_path)
     server = make_http_server(barrier, host="127.0.0.1", port=0)
@@ -160,11 +177,13 @@ def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
     try:
         with urllib.request.urlopen(f"{base}/", timeout=5.0) as resp:
             html = resp.read().decode("utf-8")
-            assert "Refmon Live Barrier" in html
+            assert "Refmon Live Security Barrier" in html
+            assert "--surface: #ffffff" in html
 
-        # Preset API + Golden replay + Rootkit scan + Mode re-signing
+        # Preset API + Full Suite + Golden replay + Rootkit scan + Mode re-signing
         for path, body in (
             ("/api/preset", {"name": "clickfix"}),
+            ("/api/run_suite", {}),
             ("/api/golden", {"scenario": "S01"}),
             ("/api/rootkit", {}),
             ("/api/mode", {"mode": "warn"}),
@@ -173,7 +192,7 @@ def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
             req = urllib.request.Request(
                 f"{base}{path}",
                 data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "X-Refmon-Token": barrier.api_token},
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=5.0) as resp:
@@ -186,6 +205,8 @@ def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
                 "guard",
                 "--port",
                 str(port),
+                "--workdir",
+                str(tmp_path),
                 "--origin",
                 "web",
                 "--",
@@ -199,6 +220,8 @@ def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
                 "guard",
                 "--port",
                 str(port),
+                "--workdir",
+                str(tmp_path),
                 "--origin",
                 "none",
                 "--",
@@ -207,9 +230,110 @@ def test_live_http_api_and_cli_guard_roundtrip(tmp_path: Path) -> None:
         )
         assert rc_ok == 0
 
-        res = send_guard_request("echo direct_helper", port=port, origin="none", execute=True)
+        res = send_guard_request(
+            "echo direct_helper", port=port, origin="none", execute=True, workdir=tmp_path
+        )
         assert res["decision"] == "allow"
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2.0)
+
+
+# -- the daemon on a shared node: API token, Host check, private work directory, random keys --
+
+
+def _serve(barrier: LiveBarrier):
+    server = make_http_server(barrier, host="127.0.0.1", port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread, server.server_address[1]
+
+
+def _status(req: urllib.request.Request) -> int:
+    try:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            return resp.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+
+
+def test_the_api_refuses_calls_without_the_token_and_from_a_foreign_host(tmp_path: Path) -> None:
+    barrier = LiveBarrier(workdir=tmp_path)
+    server, thread, port = _serve(barrier)
+    marker = tmp_path / "sandbox" / "workspace" / "pwned"
+    body = json.dumps({"command": f"touch {marker}", "origin": "none", "execute": True}).encode(
+        "utf-8"
+    )
+    url = f"http://localhost:{port}/api/guard"
+    try:
+        no_token = urllib.request.Request(url, data=body, method="POST")
+        wrong = urllib.request.Request(
+            url, data=body, method="POST", headers={"X-Refmon-Token": "guess"}
+        )
+        assert _status(no_token) == 401
+        assert _status(wrong) == 401
+        assert not marker.exists()  # nothing ran
+        state = urllib.request.Request(f"http://localhost:{port}/api/state")
+        assert _status(state) == 401
+        mode = urllib.request.Request(
+            f"http://localhost:{port}/api/mode",
+            data=b'{"mode": "observe"}',
+            method="POST",
+        )
+        assert _status(mode) == 401
+        assert barrier.policy.mode.value == "block"  # the mode was not switched off
+        rebound = urllib.request.Request(
+            f"http://localhost:{port}/api/state",
+            headers={"Host": f"evil.example:{port}", "X-Refmon-Token": barrier.api_token},
+        )
+        assert _status(rebound) == 403  # DNS rebinding
+        ok = urllib.request.Request(
+            f"http://localhost:{port}/api/state", headers={"X-Refmon-Token": barrier.api_token}
+        )
+        assert _status(ok) == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
+def test_the_client_never_falls_back_to_running_a_refused_command(tmp_path: Path) -> None:
+    daemon_dir, other_dir = tmp_path / "daemon", tmp_path / "other"
+    barrier = LiveBarrier(workdir=daemon_dir)
+    LiveBarrier(workdir=other_dir)  # a different token
+    server, thread, port = _serve(barrier)
+    marker = tmp_path / "ran"
+    try:
+        with pytest.raises(ValueError, match="refused"):
+            send_guard_request(
+                f"touch {marker}", port=port, origin="none", execute=True, workdir=other_dir
+            )
+        assert not marker.exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
+def test_secrets_are_random_private_and_kept(tmp_path: Path) -> None:
+    a = LiveBarrier(workdir=tmp_path / "a")
+    b = LiveBarrier(workdir=tmp_path / "b")
+    assert a._device_key != b._device_key and len(a._device_key) == 32
+    assert a.api_token != b.api_token
+    for path in (a.workdir / "device.key", a.workdir / "api.token", a.workdir / "admin.key"):
+        assert path.stat().st_mode & 0o077 == 0
+    assert a.workdir.stat().st_mode & 0o077 == 0
+    again = LiveBarrier(workdir=tmp_path / "a")
+    assert again._device_key == a._device_key and again.api_token == a.api_token
+    # the fingerprints of the live log are not under a key anyone can derive from the path
+    assert b"refmon-live-key" not in a._device_key
+
+
+def test_a_symlinked_work_directory_is_refused(tmp_path: Path) -> None:
+    target = tmp_path / "planted"
+    target.mkdir()
+    link = tmp_path / "refmon-live"
+    link.symlink_to(target)
+    with pytest.raises(PermissionError):
+        LiveBarrier(workdir=link)

@@ -18,8 +18,14 @@ story also has no external origin label (nothing else could say what to act on):
 trees and their new files, network, persistence and changed files. This is the only case in which
 a process without a label is touched, and it never reaches the channel roles (browser, mail,
 launcher): a file manager or run dialog that only started the command is not part of the attack. A
-story with a labeled process is handled as before, and so is a labeled story whose labeled child
-has not appeared yet.
+story with a labeled process is handled as before.
+
+v1.6 (A63): a block falls back to the producers whenever no process of the story is labeled, also
+when the story has an external origin label; in that case it still spares the user's interactive
+shell, which ran the external text but is the user's session (its labeled children are killed when
+they appear, as before). Until v1.5 such a block acted on no producer at all, waiting for a labeled
+child that never appears when the label sits on content only a channel role touched (channel roles
+never carry labels): a hold that timed out into a block then acted on nothing (F11).
 """
 
 from __future__ import annotations
@@ -65,9 +71,14 @@ class Contain:
         thr = self.tagger.policy.thresholds.origin_strength
         return any(self.tagger.strength(i, rec.last_ts) >= thr for i in rec.label_ids)
 
-    def fallback(self, rec: StoryRecord, producers: tuple[str, ...]) -> list[str]:
-        """The producers that may be touched when nothing is labeled: not a channel role."""
+    def fallback(
+        self, rec: StoryRecord, producers: tuple[str, ...], spare_session: bool = False
+    ) -> list[str]:
+        """The producers that may be touched when nothing is labeled: not a channel role, and
+        with `spare_session` not the user's interactive shell (A63)."""
         known, channel = set(rec.story.process_ids), set(self.tagger.policy.non_carrier_roles)
+        if spare_session:
+            channel.add("interactive_shell")
         return [
             p
             for p in producers
@@ -92,8 +103,9 @@ class Contain:
         (`signal_processes`); when no process of the story is labeled the plan falls back to them.
         """
         members = self.labeled_processes(rec)
-        if not members and (kind != "block" or not self.has_origin_label(rec)):
-            members = self.fallback(rec, producers)
+        if not members:  # v1.6 (A63): a labeled block falls back too, sparing the user's shell
+            spare = kind == "block" and self.has_origin_label(rec)
+            members = self.fallback(rec, producers, spare_session=spare)
         roots = self.roots(rec, members)
         labeled = set(members)
         steps: list[Step] = []

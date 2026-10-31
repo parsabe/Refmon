@@ -1,0 +1,54 @@
+% Level 3e: what leaves the device, and how (report.py, tactics.py, pseudonym.py, aggregate.py,
+% calculus/privacy.py, audit.py). Three lanes plus the offline audit. Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- lane 1: per-story reports --------------------------------------------
+  \node[rm io, minimum width=26mm] (vd) at (0,0) {\texttt{Verdict}\\\tiny fingerprints, contributions};
+  \node[rm box] (cm) at (3.55,0) {\texttt{compose}\\\tiny what happened / action taken / next step;\\\tiny fixed phrases + MITRE ATT\&CK tactic names};
+  \node[rm box] (ex) at (7.45,0) {\texttt{Reporter.export}\\\tiny device and users $\to$ keyed-hash\\\tiny pseudonyms};
+  \node[rm store, minimum width=26mm] (sd) at (10.9,0) {service desk /\\fleet server};
+  \draw[rm flow] (vd) -- (cm);
+  \draw[rm flow] (cm) -- (ex);
+  \draw[rm flow] (ex) -- (sd);
+
+  % ---- lane 2: fleet dashboard ----------------------------------------------
+  \node[rm box] (dt) at (0,-2.0) {devices per tactic\\\tiny each device counts $\le 1$};
+  \node[rm dec] (kk) at (3.55,-2.0) {$\ge k=5$\\devices?};
+  \node[rm term] (sup) at (3.55,-3.25) {left out entirely};
+  \node[rm box] (lp) at (7.45,-2.0) {$\tilde c = c + \mathrm{Lap}(1/\varepsilon)$\\\tiny $\varepsilon = 1$, sensitivity 1};
+  \node[rm store, minimum width=26mm] (db) at (10.9,-2.0) {dashboard};
+  \draw[rm flow] (dt) -- (kk);
+  \draw[rm flow] (kk) -- node[rm yes, above] {yes} (lp);
+  \draw[rm flow] (kk) -- node[rm no, right] {no} (sup);
+  \draw[rm flow] (lp) -- (db);
+
+  % ---- lane 3: re-identification -------------------------------------------
+  \node[rm human] (rq) at (0,-5.25) {request: who is\\pseudonym $p$?};
+  \node[rm store, minimum width=26mm] (vt) at (3.55,-5.25) {\texttt{Vault}\\\tiny mapping encrypted at rest};
+  \node[rm dec] (ap) at (7.45,-5.25) {2 different approvers,\\neither the requester,\\valid Ed25519 signatures?};
+  \node[rm human] (rv) at (10.9,-5.25) {real value\\returned};
+  \node[rm raw] (dn) at (7.45,-6.95) {\textbf{denied}\\\tiny \texttt{ReidentificationDenied}};
+  \node[rm store, minimum width=30mm] (al) at (10.9,-6.95) {\texttt{AuditLog}\\\tiny hash-chained, every attempt};
+  \draw[rm hflow] (rq) -- (vt);
+  \draw[rm flow] (vt) -- (ap);
+  \draw[rm flow] (ap) -- node[rm yes, above] {yes} (rv);
+  \draw[rm flow] (ap) -- node[rm no, right] {no} (dn);
+  \draw[rm ctrl] (dn) -- (al);
+  \draw[rm ctrl] (rv) -- (al);
+
+  \begin{scope}[on background layer]
+    \node[rm lane=rmStage!22,  fit=(vd)(sd)] (l1) {};
+    \node[rm lane=rmAllow!35,  fit=(dt)(db)(sup)] (l2) {};
+    \node[rm lane=rmHuman!30,  fit=(rq)(al)(dn)(ap)] (l3) {};
+  \end{scope}
+  \node[rm group label] at (l1.north west) {reports leave the device only under pseudonyms};
+  \node[rm group label] at (l2.north west) {fleet aggregates: $k$-anonymity, then the Laplace mechanism};
+  \node[rm group label] at (l3.north west) {re-identification: four eyes, always logged};
+
+  % ---- offline audit -------------------------------------------------------
+  \node[rm sub, align=left, text width=118mm] (au) at (5.45,-8.75)
+    {\textbf{privacy audit} (\texttt{refmon audit}) over every stored, logged or sent output of the lab corpus:
+     raw-content scan (synthetic secrets and generic patterns) \ $\cdot$\  dictionary reversal of every fingerprint
+     under guessable keys (a control with the real key proves the attack works) \ $\cdot$\  re-identification
+     without four eyes (one approver, the same approver twice, forged or replayed approvals).
+     Target and result: 0 raw content, 0 reversals, 0 re-identifications.};
+\end{tikzpicture}

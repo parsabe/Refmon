@@ -1,0 +1,50 @@
+% Level 5c: the read-only rootkit scanner (src/refmon/rootkit.py, refmon scan-rootkit). Wide figure.
+\begin{tikzpicture}[rm, eng/.style={rm box, align=left, text width=50mm, minimum height=7.5mm}]
+  % ---- engines -------------------------------------------------------------
+  \node[eng] (e1) at (0,0)    {\textbf{1 linker\_preload}\\\tiny \texttt{/etc/ld.so.preload}, \texttt{LD\_PRELOAD}, \texttt{LD\_AUDIT}, ephemeral or deleted libraries};
+  \node[eng] (e2) at (0,-1.0) {\textbf{2 fileless\_memory}\\\tiny \texttt{memfd:}, deleted executable, \texttt{/dev/shm}, \texttt{TracerPid}, anonymous \texttt{rwxp}};
+  \node[eng, fill=rmStage!40] (e3) at (0,-2.0) {\textbf{3 kernel\_module\_crossview}\\\tiny \texttt{/sys/module} vs.\ \texttt{/proc/modules}; forced taint bits (GPU bits: context only)};
+  \node[eng, fill=rmStage!40] (e4) at (0,-3.0) {\textbf{4 pid\_crossview}\\\tiny \texttt{/proc} listing vs.\ thread groups and own-UID ancestry};
+  \node[eng, fill=rmStage!40] (e5) at (0,-4.0) {\textbf{5 network\_crossview\_sniffer}\\\tiny \texttt{sockstat} vs.\ \texttt{/proc/net/tcp}; \texttt{IFF\_PROMISC} interfaces};
+  \node[eng, densely dashed] (e6) at (0,-5.0) {\textbf{6 external\_tools} (optional)\\\tiny unhide, chkrootkit, rkhunter; missing $\to$ \emph{unavailable}, no evidence};
+  \node[rm note, anchor=south] at (0,0.45) {read-only, own UID only, never sends signals or binds ports};
+
+  % ---- multi-pass cross-view ------------------------------------------------
+  \node[rm sub] (mp) at (5.0,-2.4) {$m$ snapshots, $\Delta\tau$ apart\\\tiny default $m=2$};
+  \node[rm sub] (is) at (5.0,-3.6) {$\Delta^*=\bigcap_{r=1}^{m}\big(V_{low}^{(r)}\setminus V_{high}^{(r)}\big)$\\\tiny transient churn drops out};
+  \draw[rm flow] (e3.east) -- (mp.west);
+  \draw[rm flow] (e4.east) -- (mp.west);
+  \draw[rm flow] (e5.east) -- (mp.west);
+  \draw[rm flow] (mp) -- (is);
+
+  % ---- findings ----------------------------------------------------------------
+  \node[rm raw, align=center] (fd) at (9.6,-2.5) {\texttt{RootkitFinding}s\\\tiny subject $\to$ HMAC fingerprint (never a raw path);\\\tiny family, nats, question, severity};
+  \draw[rm flow] (e1.east) -| ($(fd.north)+(0.45,0)$);
+  \draw[rm flow] (e2.east) -| ($(fd.north)+(-0.45,0)$);
+  \draw[rm flow] (is.east) -| ($(fd.south)+(-1.0,0)$);
+  \draw[rm flow] (e6.east) -- ++(4.3,0) |- ($(fd.west)+(0,-0.2)$);
+  \node[rm note, align=left, anchor=north west] at (3.3,-4.2)
+    {cross-view weight\\$w=\min\big(8,\ \ln 0.99 - m\ln p_{race}\big)$,\\$p_{race}=10^{-3}$};
+
+  % ---- two ways to decide ------------------------------------------------------
+  \draw (fd.south) -- (9.6,-5.6);
+  \draw (6.9,-5.6) -- (11.0,-5.6);
+  \node[rm sub] (cl) at (6.9,-6.55) {max within a family, sum across\\$L_{rk}=L_0+\sum_{fam}\max_{f} w_f$};
+  \node[rm dec] (st) at (6.9,-8.0) {self-tamper\\finding?};
+  \node[rm block] (ov) at (3.9,-8.0) {BLOCK \mdseries\tiny (override)};
+  \node[rm box] (th) at (6.9,-9.4) {thresholds $\tau_h,\tau_b$ + contract gate\\\tiny calculus decision};
+  \node[rm box] (sn) at (11.0,-6.55) {\texttt{RootkitSensor.emit}\\\tiny findings as fingerprinted events};
+  \node[rm stage] (pp) at (11.0,-8.0) {\textbf{Pipeline}\\\tiny Observe $\dots$ Gate, simulated enforcer};
+  \node[rm box] (pd) at (11.0,-9.4) {pipeline decision};
+  \node[rm store, minimum width=50mm] (rp) at (8.95,-10.75) {\texttt{RootkitScanReport}\\\tiny both decisions, capabilities, context notes};
+  \draw[rm flow] (6.9,-5.6) -- (cl);
+  \draw[rm flow] (11.0,-5.6) -- (sn);
+  \draw[rm flow] (cl) -- (st);
+  \draw[rm flow] (st) -- node[rm yes, above] {yes} (ov);
+  \draw[rm flow] (st) -- node[rm no, right] {no} (th);
+  \draw[rm flow] (sn) -- (pp);
+  \draw[rm flow] (pp) -- (pd);
+  \draw[rm flow] (th.south) -- (th.south |- rp.north);
+  \draw[rm flow] (pd.south) -- (pd.south |- rp.north);
+  \draw[rm flow] (ov.south) |- (rp.west);
+\end{tikzpicture}

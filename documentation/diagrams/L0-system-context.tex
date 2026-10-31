@@ -1,0 +1,62 @@
+% Level 0: system context (CLAUDE.md C1). Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- sensors (platform-specific, left) ----------------------------------
+  \node[rm io, minimum width=25mm] (s1) at (0, 2.4)  {Endpoint sensor\\\tiny Phase 8 adapter};
+  \node[rm io, minimum width=25mm] (s2) at (0, 1.2)  {Server sensor\\\tiny web stack, Phase 8};
+  \node[rm io, minimum width=25mm] (s3) at (0, 0)    {Replay source\\\tiny JSON Lines files};
+  \node[rm io, minimum width=25mm] (s4) at (0,-1.2)  {Live guard + watcher\\\tiny \texttt{live.py}, user space};
+  \node[rm io, minimum width=25mm] (s5) at (0,-2.4)  {Rootkit sensor\\\tiny 6 read-only engines};
+  \foreach \s in {s1,s2,s3,s4,s5} \draw (\s.east) -- (2.2,0 |- \s.east);
+  \draw (2.2,2.4) -- (2.2,-2.4);
+  \node[rm note, below] at (2.2,-2.45) {\texttt{emit(sink)}\\\texttt{RawEvent}, RAM only};
+
+  % ---- core pipeline (platform-independent) --------------------------------
+  \node[rm stage] (obs) at (3.9,0)  {\textbf{Observe}};
+  \node[rm stage] (tag) at (5.3,0)  {\textbf{Tag}};
+  \node[rm stage] (lnk) at (6.7,0)  {\textbf{Link}};
+  \node[rm stage] (jdg) at (8.1,0)  {\textbf{Judge}};
+  \node[rm stage, minimum width=15mm] (gat) at (9.75,0) {\textbf{Gate +}\\\textbf{Contain}};
+  \node[rm stage] (rep) at (9.75,-1.5) {\textbf{Report}};
+  \node[rm store] (buf) at (3.9,-1.55) {Ring buffer\\\tiny Events $\le$10\,min};
+  \node[rm store, minimum width=22mm] (rts) at (6.7,-1.55) {Rates \& baselines\\\tiny EMA, frozen on incident};
+
+  % ---- on-device control plane (top) -------------------------------------
+  \node[rm store, minimum width=20mm] (pol) at (5.3,2.05) {Signed policy\\\tiny Ed25519, rule packs};
+  \node[rm box,  minimum width=22mm] (exp) at (7.9,2.05) {Exposure stage\\\tiny inventory + advisories};
+  \node[rm box,  minimum width=22mm] (stt) at (10.3,2.05) {Self-test + heartbeat\\\tiny \texttt{probe()} copy};
+
+  \begin{scope}[on background layer]
+    \node[rm group, fill=rmStage!12, fit=(obs)(gat)(rep)(buf)(rts)] (core) {};
+    \node[rm group, inner sep=4mm, fit=(core)(pol)(exp)(stt)] (dev) {};
+  \end{scope}
+  \node[rm group label] at (core.north west) {\texttt{Core.process(event)} $\to$ [Verdict, Action]};
+  \node[rm group label] at (dev.north west) {Device (endpoint or server)};
+
+  \draw[rm flow] (2.2,0) -- (obs.west);
+  \draw[rm flow] (obs) -- (tag);
+  \draw[rm flow] (tag) -- (lnk);
+  \draw[rm flow] (lnk) -- (jdg);
+  \draw[rm flow] (jdg) -- (gat);
+  \draw[rm flow] (gat) -- node[rm lbl, right] {verdicts, actions} (rep);
+  \draw[rm ctrl] (obs) -- (buf);
+  \draw[rm ctrl] (rts) -- (lnk);
+  \draw[rm ctrl] (pol.south) -- (pol.south |- core.north);
+  \draw[rm ctrl] (exp.south) -- node[rm lbl, right] {overlay} (exp.south |- core.north);
+  \draw[rm ctrl] (stt.south) -- (stt.south |- core.north);
+
+  % privacy wall between Observe and Tag
+  \draw[rm wall] (4.6,-0.7) -- (4.6,0.7);
+  \node[rm note, text=rmBlockLine, below] at (4.6,-0.7) {privacy\\wall};
+
+  % ---- outside the device (right) -----------------------------------------
+  \node[rm human, minimum width=22mm] (usr) at (13.5, 1.1) {User / admin\\\tiny hold prompts, answers};
+  \node[rm box,   minimum width=22mm] (enf) at (13.5,-0.15) {Enforcer adapter\\\tiny \texttt{act(Action)} $\to$ Result};
+  \node[rm store, minimum width=22mm] (flt) at (13.5,-1.6) {Fleet server\\\tiny pseudonyms only};
+  \draw[rm hflow, <->] (gat.north east) -- node[rm lbl, above, sloped] {prompt / answer} (usr.west);
+  \draw[rm flow] (gat.east) -- node[rm lbl, below, sloped] {Action} (enf.west);
+  \draw[rm flow] (rep.east) -- node[rm lbl, below] {verdicts, heartbeat,\\DP counts} (flt.west);
+
+  % key holders sign the policy outside the device
+  \node[rm human, minimum width=22mm] (key) at (5.3,3.8) {Policy authors\\\tiny hold the signing key};
+  \draw[rm hflow] (key) -- node[rm lbl, right] {signed YAML} (pol);
+\end{tikzpicture}

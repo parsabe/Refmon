@@ -1,0 +1,1043 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% ============================================================================
+% Standard Packages (100% compatible with TeX Live & Overleaf out of the box)
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=0.72in,columnsep=0.24in]{geometry}
+
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,calc,fit,backgrounds}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=green!45!black,urlcolor=blue!65!black]{hyperref}
+
+% ============================================================================
+% Theorem, Lemma, Definition, and Algorithm Box Environments
+% ============================================================================
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{invariant}[theorem]{Invariant}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Clean self-contained IEEE/ACM-style Algorithm Float (no extra .sty needed)
+\newcounter{algcounter}
+\newenvironment{algbox}[2]{%
+  \begin{figure}[!t]%
+  \refstepcounter{algcounter}\label{#2}%
+  \footnotesize%
+  \noindent\rule{\columnwidth}{1.1pt}\vspace{-2pt}\\
+  \textbf{Algorithm~\thealgcounter:} #1\vspace{-4pt}\\
+  \noindent\rule{\columnwidth}{0.5pt}\vspace{2pt}%
+  \begin{enumerate}[label=\textbf{\arabic*:},leftmargin=1.65em,itemsep=1.5pt,topsep=2pt,parsep=0pt]%
+}{%
+  \end{enumerate}\vspace{-3pt}%
+  \noindent\rule{\columnwidth}{1.1pt}%
+  \end{figure}%
+}
+
+% Listings configuration for concise Python / Policy excerpts
+\definecolor{codebg}{HTML}{F6F8FA}
+\definecolor{codeframe}{HTML}{D8DEE4}
+\definecolor{codekw}{HTML}{0550AE}
+\definecolor{codecmt}{HTML}{59636E}
+\definecolor{codestr}{HTML}{0A3069}
+
+\lstdefinestyle{refmoncode}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecmt}\itshape,
+  stringstyle=\color{codestr},
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  aboveskip=6pt,
+  belowskip=6pt,
+  xleftmargin=3pt,
+  xrightmargin=3pt
+}
+
+\setlength{\parskip}{2pt}
+
+% ============================================================================
+% Title & Author Metadata
+% ============================================================================
+\title{\Large\bfseries Refmon (Provenance Gate v2): A Privacy-Preserving Reference Monitor\\
+Combining Provenance Tagging, Role Contracts, and Cost-Sensitive\\
+Bayesian Log-Odds Calculus for Endpoint, Server, and Cluster Defense}
+
+\author{
+  Security Systems \& High-Performance Computing Research Group\\
+  Department of Computer Science\\
+  \texttt{refmon-research@example.edu}
+}
+\date{October 2026 \quad (Frozen Specification Tag \texttt{v1.3})}
+
+\begin{document}
+\maketitle
+
+% ============================================================================
+% ABSTRACT
+% ============================================================================
+\begin{abstract}
+Signature scanners and opaque machine-learning classifiers struggle against emerging social-engineering lures (such as ClickFix clipboard-paste execution), zero-day server remote code execution (RCE), prompt-injected AI coding agents, and stealth userland/kernel rootkits---while frequently exfiltrating sensitive command lines, URLs, and credentials into centralized telemetry lakes. We present \textbf{Refmon} (\emph{Provenance Gate v2}, frozen specification \texttt{v1.3}), a deterministic, platform-agnostic reference monitor that detects, contains, and explains attacks by judging \emph{post-exploitation behavioral consequences} rather than exploit payloads. Refmon evaluates every causal ``story'' of system events along three orthogonal axes---\textbf{Origin} (untrusted external provenance), \textbf{Contract} (deviations from cryptographically signed per-role behavioral allowances), and \textbf{Effect} (high-risk capabilities)---combined via a monotone question-grouped log-likelihood ratio (LLR) calculus in natural log-odds units (\emph{nats}) against Bayes-optimal cost thresholds ($\tau_{\text{hold}}, \tau_{\text{block}}$) and a mandatory \emph{Contract Gate}. Raw payloads never leave an in-memory \texttt{Observe} boundary, where content is irreversibly converted into per-device HMAC-SHA256 digests after extracting scalar obfuscation features and confirming Bloom-filtered threat indicators. We further integrate a six-engine read-only cross-view rootkit sensor using multi-pass discrepancy intersection and an unprivileged user-space barrier + live light-theme audit dashboard suitable for shared university HPC clusters. Across 46 golden scenarios spanning 17 attack families, 879 seeded mutation variants, a 16-scenario live attack/control suite, and over 1,620 automated unit and property tests, Refmon achieves 100\% golden accuracy, contains 98.7\% of mutated attack variants ($p = 3.3 \times 10^{-24}$ vs.\ \texttt{v1.0}) at a 2.0\% neutral false-block rate, and passes adversarial privacy audits with zero raw content leaks and zero fingerprint reversals.
+\end{abstract}
+
+\noindent\textbf{Keywords:} Reference Monitor, Dynamic Provenance Tracking, Role Contracts, Bayesian Log-Likelihood Calculus, Differential Privacy, Cross-View Rootkit Detection, ClickFix Defense, HPC Cluster Security.
+
+% ============================================================================
+% 1. INTRODUCTION
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Modern computing environments---ranging from user workstations and web application servers to shared multi-tenant university High-Performance Computing (HPC) clusters---face attack vectors that bypass traditional perimeter and signature defenses. Three trends exemplify this shift:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Human-in-the-loop social engineering (ClickFix / TerminalFix / FileFix):} Rather than delivering a binary executable that anti-virus engines can quarantine, adversaries display fraudulent browser verification prompts or documentation snippets instructing the user to copy and paste a shell pipeline (e.g., \texttt{curl ... | sh} or base64-encoded PowerShell) directly into an interactive terminal~\cite{mitre2024attack}. Even when the user is deceived, a runtime barrier should intercept the pasted execution before harm occurs.
+  \item \textbf{Zero-day server RCE and AI agent hijacking:} Memory-corruption or deserialization flaws in web workers and Node.js runtimes (\texttt{PHP2Shell}, \texttt{Node2Shell}), as well as indirect prompt injections against autonomous AI coding agents~\cite{greshake2023not}, coerce trusted processes into spawning shells, dropping executable web shells, or reading application secrets.
+  \item \textbf{Stealth rootkits and defense tampering:} Userland preload rootkits (\texttt{LD\_PRELOAD}, \texttt{/etc/ld.so.preload}), fileless \texttt{memfd\_create} binaries, and loadable kernel module (LKM) rootkits hide processes, sockets, and modules from standard administrative utilities while attempting to blind monitoring daemons~\cite{wang2005strider}.
+\end{enumerate}
+
+Existing Endpoint Detection and Response (EDR) tools suffer from two structural weaknesses when deployed in academic or privacy-regulated environments. First, signature-driven rules fail on unseen zero-day exploits, while black-box neural anomaly detectors produce unexplainable alerts and remain vulnerable to baseline poisoning. Second, commercial EDR agents routinely record raw command-line arguments, HTTP bodies, file paths, and environment variables on disk or transmit them to cloud backends---violating European data-protection norms and exposing research secrets or credentials stored in shell histories.
+
+\paragraph{Core Insight.} Regardless of how an unknown vulnerability is exploited or how a user is socially engineered, the attacker must subsequently \emph{act} to achieve objectives: spawn unexpected programs, write executable scripts into web roots, connect to unlisted external hosts, read credential stores, escalate privileges, encrypt files en masse, or tamper with security tooling. Those post-compromise actions violate the \emph{role contract} of the acting process.
+
+\paragraph{Contributions.} This paper presents the design, mathematical foundations, implementation, and evaluation of \textbf{Refmon} (\emph{Provenance Gate v2}, tag \texttt{v1.3}):
+\begin{itemize}[leftmargin=1.3em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Privacy-First Six-Stage Reference Monitor (\S\ref{sec:method}):} A platform-independent pipeline (\texttt{Observe} $\to$ \texttt{Tag} $\to$ \texttt{Link} $\to$ \texttt{Judge} $\to$ \texttt{Gate} $\to$ \texttt{Report}) enforcing an irreversible RAM-only privacy boundary via keyed HMAC-SHA256 digests, local Bloom-confirmed threat lists, $\varepsilon$-differential privacy, $k$-anonymity, and four-eyes pseudonym re-identification.
+  \item \textbf{Monotone Bayesian Log-Odds Calculus \& Contract Gate (\S\ref{sec:judge}--\ref{sec:rates}):} A deterministic, training-free mathematical engine combining exponential provenance decay, Noisy-OR label fusion, Laplace-smoothed role surprisal, Good-Turing baseline maturity, dual-window Poisson/CUSUM rate tests, and Bayes minimal-risk thresholds ($\tau_{\text{hold}}, \tau_{\text{block}}$), including a proven monotonicity fix (\texttt{v1.3}) resolving a subtle jump discontinuity under fading labels.
+  \item \textbf{Six-Engine Cross-View Rootkit Sensor \& Unprivileged Cluster Barrier (\S\ref{sec:rootkit}, \S\ref{sec:impl}):} Read-only user-space rootkit detection comparing high-level OS enumerations against low-level kernel/memory invariants across multiple passes, paired with an Ed25519-signed policy barrier, automatic file quarantine, and a clean light-theme telemetry interface operable without \texttt{root} privileges on shared Linux nodes.
+  \item \textbf{Rigorous Reproducible Evaluation \& Complete Proofs (\S\ref{sec:eval}, Appendices~\ref{app:decay}--\ref{app:rootkit}):} Pre-registered variant-seed evaluation across 46 golden scenarios, 879 mutated streams, 16 live attack/benign scenarios, and formal proofs of every mathematical property.
+\end{itemize}
+
+% ============================================================================
+% 2. BACKGROUND AND RELATED WORK
+% ============================================================================
+\section{Background and Related Work}
+\label{sec:related}
+
+\subsection{Reference Monitors and Information-Flow Provenance}
+Anderson's classical Reference Monitor concept~\cite{anderson1972computer} stipulates three requirements for an access mediation mechanism: it must be \emph{tamperproof}, \emph{always invoked}, and \emph{small enough to be subject to complete analysis and tests}. Denning~\cite{denning1976lattice} formalized lattice-based information-flow control, demonstrating how security labels propagate from untrusted inputs to derived data and processes. Dynamic taint analysis systems such as TaintCheck~\cite{newsome2005dynamic} track byte-level taint at high instrumentation cost ($5\times$--$30\times$ slowdown), whereas whole-system provenance monitors---including CamFlow~\cite{pasquier2017practical}, Sleuth~\cite{hossain2017sleuth}, Holmes~\cite{milajerdi2019holmes}, and Unicorn~\cite{han2020unicorn}---track causal graphs at the OS process, file, and socket granularity.
+
+Unlike graph-embedding approaches such as Unicorn~\cite{han2020unicorn} that hash multi-hop neighborhoods into high-dimensional sketches classified by unsupervised clustering (making individual false positives opaque to operators), Refmon aligns with Holmes~\cite{milajerdi2019holmes} in correlating causal stories against high-level tactics, while introducing explicit \emph{role contracts}, continuous half-life decay with persistent contract evidence, and exact cost-derived log-odds thresholds.
+
+\subsection{Mandatory Access Control and Process Contracts}
+Linux security frameworks such as SELinux~\cite{smalley2001implementing}, AppArmor~\cite{bauer2006paranoid}, and Seccomp-BPF~\cite{corbet2012seccomp} enforce static per-binary mandatory access control (MAC) profiles. While effective for rigidly confined daemons, static MAC profiles cannot distinguish \emph{provenance context}: an interactive shell (\texttt{bash}) must be allowed to execute \texttt{curl} and \texttt{sh} during normal developer workflows, yet the exact same shell executing command text pasted from an untrusted webpage (ClickFix) represents a severe breach. Refmon bridges MAC contracts and dynamic provenance via \emph{provenance-conditioned contracts} (e.g., \texttt{external\_content\_exec: deny} and Design Decision D23, where role-permitted high-volume effects remain benign unless tainted by an external origin label).
+
+\subsection{Sequential Hypothesis Testing and Bayesian Fusion}
+Wald's Sequential Probability Ratio Test (SPRT)~\cite{wald1945sequential} and Page's Cumulative Sum (CUSUM) control chart~\cite{page1954continuous}, proved minimax-optimal by Lorden~\cite{lorden1971procedures}, form the bedrock of statistical change-point detection in network intrusion detection~\cite{jung2004fast}. Naive Bayes alert correlators sum log-likelihood ratios across all firing rules, which severely overcounts correlated indicators within the same behavioral dimension (e.g., three overlapping network-fetch heuristics firing on a single socket). Pearl's Noisy-OR model~\cite{pearl1988probabilistic} handles independent causal pathways for label combination, while Refmon's \emph{max-within-question, sum-across-questions} operator (\S\ref{sec:judge}) bounds within-axis correlation while preserving additive Bayesian evidence across orthogonal questions.
+
+\subsection{Cross-View Rootkit Detection}
+Host rootkit scanners such as \texttt{chkrootkit} and \texttt{rkhunter} rely heavily on static file-path signatures and known bad hashes, missing novel LKM hooks or memory-only implants. Cross-view diffing, pioneered by Strider GhostBuster~\cite{wang2005strider} and formalized in virtual-machine introspection~\cite{garfinkel2003virtual}, compares a high-level API listing (susceptible to syscall or \texttt{readdir} hooking) against a lower-level structural view (e.g., kernel object trees in \texttt{/sys/module} or direct \texttt{kill(pid, 0)} / \texttt{/proc/[pid]/status} probes). Single-pass user-space scanners such as \texttt{unhide} suffer from transient race conditions when short-lived processes exit mid-scan; Refmon resolves this via $m$-pass discrepancy intersection integrated directly into its log-odds engine.
+
+\subsection{Privacy-Preserving Security Telemetry}
+Storing cleartext audit logs creates a high-value target for attackers and insiders. Cryptographic keyed hashing via HMAC~\cite{bellare1996keying} provides collision-resistant and preimage-resistant correlation tokens when keyed with a device-local secret, while Bloom filters~\cite{bloom1970space} enable compact threat-indicator distribution. For cross-device fleet aggregation, $\varepsilon$-differential privacy~\cite{dwork2006calibrating} and $k$-anonymity~\cite{sweeney2002kanonymity} bound membership disclosure. Refmon combines all four mechanisms with cryptographic policy signing (Ed25519~\cite{bernstein2012high}) and four-eyes dual-approver pseudonym escrow.
+
+% ============================================================================
+% 3. METHODOLOGY AND MATHEMATICAL FORMULATION
+% ============================================================================
+\section{Methodology and Mathematical Formulation}
+\label{sec:method}
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=0.96\textwidth]{figures/refmon_pipeline.jpg}
+  \caption{High-level architectural overview of the six-stage Refmon Security Pipeline governed by an Ed25519-signed policy (\texttt{policy.yaml}). Raw inputs are inspected exclusively in volatile memory inside Stage~1 (\texttt{Observe}) and immediately reduced to keyed \texttt{hmac:sha256} digests before entering provenance tagging, story linking, three-question Bayesian judging, containment gating, and privacy-safe reporting.}
+  \label{fig:pipeline_img}
+\end{figure*}
+
+% Native TikZ Formal Dataflow & Shapes Diagram (2-column)
+\begin{figure*}[!t]
+  \centering
+  \begin{tikzpicture}[
+    font=\scriptsize\sffamily,
+    >=Latex,
+    stage/.style={rectangle, rounded corners=3pt, draw=black!70, fill=blue!4, thick, minimum width=2.05cm, minimum height=1.15cm, align=center},
+    store/.style={cylinder, shape border rotate=90, aspect=0.22, draw=black!65, fill=gray!10, thick, minimum width=2.1cm, minimum height=0.82cm, align=center},
+    gate/.style={diamond, aspect=1.7, draw=orange!75!black, fill=orange!8, thick, inner sep=1.5pt, align=center},
+    outallow/.style={rectangle, rounded corners=2pt, draw=green!55!black, fill=green!10, thick, minimum width=1.65cm, minimum height=0.52cm, align=center},
+    outhold/.style={rectangle, rounded corners=2pt, draw=orange!75!black, fill=yellow!16, thick, minimum width=1.65cm, minimum height=0.52cm, align=center},
+    outblock/.style={rectangle, rounded corners=2pt, draw=red!70!black, fill=red!10, thick, minimum width=1.65cm, minimum height=0.52cm, align=center}
+  ]
+    % Top Stores
+    \node[store] (pol) at (3.2, 2.05) {Signed Policy\\[-1pt]\tiny Ed25519 \texttt{policy.yaml}};
+    \node[store] (bloom) at (0.3, 2.05) {Bloom + Exact\\[-1pt]\tiny Threat Digest List};
+    \node[store] (ema) at (6.3, 2.05) {EMA \& Counts\\[-1pt]\tiny Frozen on Incident};
+    \node[store] (exp) at (9.4, 2.05) {Exposure Stage\\[-1pt]\tiny Inventory + CVE};
+
+    % Pipeline Stages
+    \node[rectangle, draw=red!65!black, fill=red!6, thick, minimum width=1.7cm, minimum height=1.15cm, align=center] (raw) at (-2.35, 0) {\textbf{Sensors}\\[-1pt]\tiny \texttt{RawEvent} (RAM)\\[-2pt]\tiny CLI / Files / Rootkit};
+    \node[stage] (obs) at (0.3, 0) {\textbf{1. Observe}\\[-1pt]\tiny $\text{HMAC}_K(\text{norm}(c))$\\[-2pt]\tiny Entropy $H(X)$};
+    \node[stage] (tag) at (2.95, 0) {\textbf{2. Tag}\\[-1pt]\tiny Decay $2^{-\Delta t / T_{1/2}}$\\[-2pt]\tiny Noisy-OR DAG};
+    \node[stage] (lnk) at (5.55, 0) {\textbf{3. Link}\\[-1pt]\tiny Story Graph $\mathcal{G}_S$\\[-2pt]\tiny Quiet Window $W_q$};
+    \node[stage] (jdg) at (8.25, 0) {\textbf{4. Judge}\\[-1pt]\tiny $L = L_0 + \sum_q \max w_j s_j$\\[-2pt]\tiny Overrides $\mathcal{O}$};
+    \node[gate] (cgate) at (11.05, 0) {\textbf{Contract}\\[-2pt]\textbf{Gate?}};
+
+    % Decisions & Report
+    \node[outallow] (allow) at (13.35, 0.95) {\textbf{ALLOW} ($L < \tau_h$)};
+    \node[outhold]  (hold)  at (13.35, 0.0)  {\textbf{HOLD} ($\tau_h \le L < \tau_b$)};
+    \node[outblock] (block) at (13.35, -0.95) {\textbf{BLOCK} ($L \ge \tau_b \land C$)};
+
+    % Privacy Boundary Dashed Line
+    \draw[dashed, very thick, red!70!black] (1.62, -1.35) -- (1.62, 1.45);
+    \node[font=\tiny\bfseries\sffamily, text=red!70!black, fill=white, inner sep=1pt] at (1.62, -1.52) {PRIVACY WALL (0 Raw Bytes Beyond)};
+
+    % Horizontal Flow Arrows
+    \draw[->, thick] (raw) -- (obs);
+    \draw[->, thick] (obs) -- node[above, font=\tiny]{\texttt{Event}} (tag);
+    \draw[->, thick] (tag) -- (lnk);
+    \draw[->, thick] (lnk) -- (jdg);
+    \draw[->, thick] (jdg) -- node[above, font=\tiny]{$L, \mathcal{O}$} (cgate);
+    \draw[->, thick, green!50!black] (cgate.north) |- (allow.west);
+    \draw[->, thick, orange!75!black] (cgate.east) -- node[above, font=\tiny]{$\neg C$} (hold.west);
+    \draw[->, thick, red!70!black] (cgate.south) |- node[below, pos=0.75, font=\tiny]{$C \lor \mathcal{O}$} (block.west);
+
+    % Top Governance Arrows
+    \draw[->, densely dashed, black!60] (bloom) -- (obs);
+    \draw[->, densely dashed, black!60] (pol.south) -- (tag.north);
+    \draw[->, densely dashed, black!60] (pol.south) -- (obs.north east);
+    \draw[->, densely dashed, black!60] (pol.south) -- (jdg.north west);
+    \draw[->, densely dashed, black!60] (ema.south) -- (jdg.north);
+    \draw[->, densely dashed, black!60] (exp.south) -- (jdg.north east);
+  \end{tikzpicture}
+  \caption{Formal TikZ vector schematic of Refmon's mathematical dataflow and shapes: rectangles denote deterministic functional stages, cylinders denote signed/stateful stores, the red dashed boundary marks the irreversible \texttt{Observe} cryptographic wall, and the diamond gate enforces the Contract Gate invariant ($L \ge \tau_{\text{block}} \land \neg C \land \mathcal{O}=\varnothing \implies \text{HOLD}$).}
+  \label{fig:tikz_dataflow}
+\end{figure*}
+
+\subsection{System Architecture and Core Principles}
+\label{sec:arch}
+
+Figures~\ref{fig:pipeline_img} and~\ref{fig:tikz_dataflow} depict the six-stage architecture of Refmon. Platform-specific sensors emit in-memory \texttt{RawEvent} tuples $(e_{\text{id}}, t, d, \tau, a, o_{\text{raw}}, \alpha_{\text{raw}})$ across 13 canonical event types:
+\[
+\mathcal{T} = \{
+\begin{aligned}[t]
+&\texttt{content\_in}, \texttt{request\_in}, \texttt{request\_end}, \texttt{exec}, \texttt{net\_connect},\\
+&\texttt{file\_write}, \texttt{persist}, \texttt{asset\_access}, \texttt{priv\_change},\\
+&\texttt{security\_tamper}, \texttt{user\_input}, \texttt{admin\_input}, \texttt{response\_out}\}.
+\end{aligned}
+\]
+Each actor $a = (\text{id}, \text{parent}, r, \text{interactive}, u)$ carries a workload role $r \in \mathcal{R}$ (16 built-in roles such as \texttt{interactive\_shell}, \texttt{web\_worker}, \texttt{node\_app\_server}, \texttt{package\_installer}, \texttt{office}, \texttt{launcher}, \texttt{agent}, \texttt{browser}, \texttt{mail}, plus policy-extensible roles \texttt{backup\_job}, \texttt{vuln\_scanner}, \texttt{patch\_tool}).
+
+Two foundational invariants govern the entire pipeline:
+\begin{invariant}[Zero Raw Persistence]
+No raw payload $c = o_{\text{raw}}.\text{content}$ or free-text attribute (\texttt{domain}, \texttt{host}, \texttt{ip}, \texttt{url\_path}, \texttt{program}, \texttt{signer}) ever crosses the output boundary of \texttt{Observe}. Post-\texttt{Observe} \texttt{Event} records validate against a strict 21-key scalar/identifier allowlist $\mathcal{K}_{\text{allow}}$.
+\end{invariant}
+\begin{invariant}[Missing Information Neutrality]
+Whenever a sensor lacks a capability (e.g., code-signature verification returns \texttt{signed = "unknown"} or a learned role baseline is not yet statistically mature), the dependent signal is omitted ($s_j = 0$) rather than treated as suspicious, and the capability gap is reported out-of-band via the \texttt{Heartbeat} monitor.
+\end{invariant}
+
+\subsection{Stage 1 (\texttt{Observe}): Cryptographic Privacy Boundary and Obfuscation Features}
+\label{sec:observe}
+
+Given raw content string $c \in \Sigma^*$ and a 256-bit device-local secret key $K_{\text{dev}}$, \texttt{Observe} first whitespace-normalizes $\tilde{c} = \text{norm}(c)$ and computes its irreversible fingerprint:
+\begin{equation}
+  f(c) = \texttt{"hmac:"} \,\|\, \operatorname{Hex}\!\Big(\operatorname{HMAC-SHA256}\big(K_{\text{dev}},\, \tilde{c}\big)\Big).
+  \label{eq:hmac}
+\end{equation}
+
+Before discarding $c$ from RAM, if $\tau \in \{\texttt{exec}, \texttt{content\_in}, \texttt{user\_input}, \texttt{admin\_input}\}$, \texttt{Observe} extracts three scalar obfuscation metrics over the character histogram $\{n_x\}_{x \in \Sigma}$ of $c$ ($N_c = |c| > 0$, $p_x = n_x / N_c$):
+\begin{align}
+  H(c) &= -\sum_{x \in \Sigma,\, p_x > 0} p_x \log_2 p_x \quad\text{(bits/char)}, \label{eq:entropy}\\
+  \rho_{\text{enc}}(c) &= \frac{1}{N_c}\sum_{i=1}^{N_c} \mathbf{1}\!\left[c_i \in \Sigma_{\text{b64/hex}}\right], \label{eq:encratio}\\
+  r_{\text{ws}}(c) &= \max\big\{\ell \in \mathbb{N} : \exists\, i,\; c_{i..i+\ell-1} \in \{\text{' '}, \text{'\textbackslash t'}\}^\ell\big\}. \label{eq:wsrun}
+\end{align}
+The \texttt{effect\_hide} signal fires whenever $H(c) > H_{\max}$ ($5.2$~bits), $r_{\text{ws}}(c) > r_{\max}$, or explicit \texttt{hidden\_window} / \texttt{encoded\_payload} flags hold, catching base64-encoded lures and ClickFix whitespace-padding attacks (where malicious commands are pushed off-screen via hundreds of spaces) without retaining a single character of $c$.
+
+\paragraph{Two-Stage Bloom Threat Confirmation.} Threat indicators $\mathcal{D}_{\text{bad}}$ are stored as list-keyed HMAC digests $d_i = \operatorname{HMAC-SHA256}(K_{\text{list}}, \tilde{v}_i)$ inside a bit-array Bloom filter $\mathcal{B}$ of size $m$ bits and $k_h$ double-hashed indices:
+\begin{equation}
+  m = \left\lceil -\frac{n \ln p_{\text{fp}}}{(\ln 2)^2} \right\rceil, \qquad
+  k_h = \max\!\left(1,\, \operatorname{round}\!\left(\frac{m}{n}\ln 2\right)\right),
+  \label{eq:bloom}
+\end{equation}
+sized for $p_{\text{fp}} \le 10^{-3}$. Any Bloom hit $\mathcal{B}.\text{might\_contain}(d) = 1$ is treated strictly as a fast filter hint and verified against the exact digest set $\mathcal{D}_{\text{exact}}$ inside \texttt{Observe}, guaranteeing an operational threat-list false-positive rate of \emph{strictly zero} (proved in Appendix~\ref{app:privacy}).
+
+\subsection{Stage 2 (\texttt{Tag}): Provenance DAG, Decay, and Noisy-OR Fusion}
+\label{sec:tag}
+
+Untrusted external ingress ($\tau \in \{\texttt{content\_in}, \texttt{request\_in}\}$ with \texttt{source\_class} $\in \{\texttt{web}, \texttt{mail}, \texttt{removable}, \texttt{download}, \texttt{inbound\_request}, \texttt{outbound\_response}, \texttt{package}, \texttt{agent\_input}\}$ and not matching \texttt{trusted\_sources}) mints a provenance label $\ell = (\text{id}, t_0, s_0=1, \text{persistent}, \mathcal{E}_{\text{contract}})$.
+
+\paragraph{Exponential Half-Life Decay.} At event timestamp $t \ge t_0$ ($\Delta t = t - t_0$), a non-persistent label with no recorded contract violation decays with policy half-life $T_{1/2}$ ($30$~min):
+\begin{equation}
+  s_\ell(t) =
+  \begin{cases}
+    s_0, & \text{if } \ell.\text{persistent} \lor \mathcal{E}_{\text{contract}}(\ell) \neq \varnothing,\\[3pt]
+    s_0 \cdot 2^{-\Delta t / T_{1/2}}, & \text{otherwise.}
+  \end{cases}
+  \label{eq:decay}
+\end{equation}
+Freezing decay once $\mathcal{E}_{\text{contract}}(\ell) \neq \varnothing$ (\texttt{v1.1}, decision A49) prevents an adversary from executing an initial contract breach, sleeping past $T_{1/2}$, and resuming post-exploitation unlabeled.
+
+\paragraph{Edge Attenuation and Noisy-OR Combination.} Across a causal edge $e$ with attenuation $a_e \in (0, 1]$, child strength is $s_{\text{child}} = a_e \cdot s_{\text{parent}}$. When an actor or object carries multiple active labels $\{\ell_1, \dots, \ell_m\}$ with strengths $s_1, \dots, s_m \in [0, 1]$, their combined external-origin strength is fused via Pearl's Noisy-OR operator:
+\begin{equation}
+  s_{\text{comb}}(t) = 1 - \prod_{i=1}^{m} \big(1 - s_{\ell_i}(t)\big).
+  \label{eq:noisyor}
+\end{equation}
+When a labeled process writes an executable to a configured \texttt{web\_root} or creates a startup entry (\texttt{persist}), the target object receives $\text{persistent} = \texttt{true}$ along with the originating story's contract violations $\mathcal{E}_{\text{contract}}$, ensuring delayed execution days later (Scenario \texttt{S06}) inherits full contract evidence.
+
+\subsection{Stage 3 (\texttt{Link}): Causal Story Equivalence}
+\label{sec:link}
+
+\texttt{Link} maintains a dynamic partition of observed events into causal stories $\{S_1, S_2, \dots\}$. Process-keyed actors merge along parent-child spawn trees ($\text{actor.parent}$) and shared labeled object fingerprints within the policy quiet window $W_q$ ($10$~min), whereas channel roles (\texttt{browser}, \texttt{mail}) are excluded as merge keys (\texttt{non\_process\_keyed\_roles}) so two unrelated downloads opened in the same browser never contaminate each other's stories.
+
+\subsection{Stage 4 (\texttt{Judge}): Three-Question Max-Sum LLR Calculus and Thresholds}
+\label{sec:judge}
+
+% 1-column TikZ Bayesian Decision Space & Contract Gate Shape Diagram
+\begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize\sffamily, >=Latex]
+    % Background zones
+    \fill[green!10] (0, 0) rectangle (2.6, 1.05);
+    \fill[yellow!22] (2.6, 0) rectangle (4.15, 1.05);
+    \fill[red!12] (4.15, 0) rectangle (7.6, 1.05);
+
+    % Axis
+    \draw[->, thick] (-0.1, 0) -- (7.85, 0) node[right, font=\scriptsize]{$L$ (nats)};
+    \draw[dashed, thick, orange!80!black] (2.6, -0.15) -- (2.6, 1.25) node[above, font=\tiny\bfseries]{$\tau_{\text{hold}}=-4.94$};
+    \draw[dashed, thick, red!75!black] (4.15, -0.15) -- (4.15, 1.25) node[above, font=\tiny\bfseries]{$\tau_{\text{block}}=-3.91$};
+
+    % Zone labels
+    \node[font=\tiny\bfseries, text=green!45!black] at (1.3, 0.85) {ALLOW ZONE};
+    \node[font=\tiny\bfseries, text=orange!70!black] at (3.38, 0.85) {HOLD};
+    \node[font=\tiny\bfseries, text=red!70!black] at (5.88, 0.85) {BLOCK (if $C$ fails)};
+
+    % Scenario points
+    \filldraw[green!55!black] (0.35, 0.35) circle (2pt) node[below=3pt, font=\tiny]{$L_0\!=\!-6.91$};
+    \filldraw[green!55!black] (2.15, 0.35) circle (2pt) node[above=1pt, font=\tiny]{\texttt{S11} ($-5.11$)};
+    \filldraw[orange!85!black] (3.35, 0.35) circle (2pt) node[below=3pt, font=\tiny]{\texttt{S05} ($-4.41$)};
+    \filldraw[red!75!black] (5.35, 0.35) circle (2pt) node[above=1pt, font=\tiny]{\texttt{S01} ($-2.61$)};
+    \filldraw[red!75!black] (7.10, 0.35) circle (2pt) node[below=3pt, font=\tiny]{\texttt{S13} ($-0.61$)};
+
+    % Contract gate curved arrow
+    \draw[->, thick, bend right=28, orange!85!black] (5.9, 0.58) to node[above, font=\tiny]{$\neg C$ (Contract Gate)} (3.55, 0.58);
+  \end{tikzpicture}
+  \caption{Bayesian log-odds decision geometry showing prior $L_0 = -6.91$~nats, cost thresholds $\tau_{\text{hold}} = -4.94$ and $\tau_{\text{block}} = -3.91$, benchmark trajectories (\texttt{S11} pasted benign echo, \texttt{S05} hand-typed fetch, \texttt{S01} ClickFix, \texttt{S13} web RCE), and the Contract Gate projection.}
+  \label{fig:tikz_thresholds}
+\end{figure}
+
+For each story $S$, let $s_{\text{ori}}(S) = \max_{\ell \in \mathcal{L}(S)} s_\ell(t_{\text{last}})$ denote the strongest active provenance label. \texttt{Judge} evaluates three questions $\mathcal{Q} = \{\text{origin}, \text{contract}, \text{effect}\}$:
+\begin{itemize}[leftmargin=1.3em,itemsep=1pt,topsep=2pt]
+  \item $Q_{\text{origin}}$ fails iff $s_{\text{ori}}(S) \ge \theta_{\text{ori}}$ ($0.5$), yielding signal \texttt{origin\_external} with strength $s_{\text{ori}}(S) \in [\theta_{\text{ori}}, 1]$.
+  \item $Q_{\text{contract}}$ fails iff $\mathcal{S}_{\text{contract}}(S) \neq \varnothing$ (role violation, universal violation, unsigned external launch, or mature role surprisal), each with unit strength $s_j = 1$.
+  \item $Q_{\text{effect}}$ fails iff $\mathcal{S}_{\text{effect}}(S) \neq \varnothing$ after filtering role-allowed effects when $\neg Q_{\text{origin}}$ (Design Decision D23), each with unit strength $s_j = 1$.
+\end{itemize}
+
+\paragraph{Max-Sum Log-Likelihood Ratio Calculus.} Each signal $j$ carries weight
+\begin{equation}
+  w_j = \ln \frac{\mathbb{P}(j \mid \text{attack})}{\mathbb{P}(j \mid \text{benign})} \quad (\text{in nats}),
+  \label{eq:llr_weight}
+\end{equation}
+either fixed from expert prior rates in the signed policy (Table~\ref{tab:weights}) or re-estimated from labeled replay corpora with Laplace smoothing:
+\begin{equation}
+  \hat{w}_j = \ln \frac{(a_j + 1)/(|\mathcal{A}| + 2)}{(b_j + 1)/(|\mathcal{B}| + 2)}.
+  \label{eq:reestimate}
+\end{equation}
+Given prior attack probability $\pi \in (0, 1)$ ($\pi = 10^{-3} \implies L_0 = \ln\frac{\pi}{1-\pi} \approx -6.9068$~nats), the posterior log-odds of story $S$ is:
+\begin{equation}
+  L(S) = \ln\frac{\pi}{1 - \pi} + \sum_{q \in \{\text{origin},\,\text{contract},\,\text{effect}\}} \;\max_{j \in \mathcal{S}_q(S)} \big(w_j \cdot s_j\big),
+  \label{eq:logodds}
+\end{equation}
+with empty maxima defined as $0$, and posterior probability $\mathbb{P}(\text{attack} \mid S) = \sigma(L(S)) = (1 + e^{-L(S)})^{-1}$. Crucially, in \texttt{v1.3} (Decision A55), only $Q_{\text{origin}}$ scales by $s_{\text{ori}}(S)$ while Contract and Effect signals take $s_j = 1$, guaranteeing that $L(S)$ is monotonically non-decreasing in label strength (Theorem~\ref{thm:monotone}, Appendix~\ref{app:monotone}).
+
+\begin{table}[!t]
+  \centering
+  \caption{Frozen \texttt{v1.3} Policy Signal Weights ($w_j$ in nats) and Cost Parameters ($\pi = 0.001$, $C_{\text{miss}}=1000$, $C_{\text{fb}}=20$, $C_{\text{hold}}=5$, $h=0.7$).}
+  \label{tab:weights}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{@{}llrlr@{}}
+    \toprule
+    \textbf{Axis} & \textbf{Signal Name} & \textbf{$w_j$} & \textbf{Signal Name} & \textbf{$w_j$} \\
+    \midrule
+    Origin   & \texttt{origin\_external} & $0.8$ & --- & --- \\
+    \midrule
+    Contract & \texttt{external\_exec} & $1.0$ & \texttt{write\_other} & $1.0$ \\
+             & \texttt{unsigned\_launch} & $1.5$ & \texttt{surprisal} & $2.0$ \\
+             & \texttt{universal\_violation} & $2.0$ & \texttt{exec\_violation} & $2.5$ \\
+             & \texttt{connect\_violation} & $2.5$ & \texttt{asset\_violation} & $2.5$ \\
+             & \texttt{web\_worker\_exec} & $3.0$ & \texttt{write\_executable} & $3.5$ \\
+             & \texttt{persist\_violation} & $3.5$ & \texttt{privilege\_violation} & $3.5$ \\
+    \midrule
+    Effect   & \texttt{asset\_access} & $1.5$ & \texttt{response\_anomaly} & $1.5$ \\
+             & \texttt{hide} & $2.0$ & \texttt{fetch} & $2.5$ \\
+             & \texttt{persist} & $2.5$ & \texttt{exfil} & $2.5$ \\
+             & \texttt{escalate} & $2.5$ & \texttt{mass\_change} & $2.5$ \\
+             & \texttt{tamper} & $3.0$ & \texttt{lateral} & $3.5$ \\
+             & \texttt{credential} & $3.5$ & \texttt{resp\_anom\_repeated} & $3.5$ \\
+             & \texttt{threat\_list\_hit} & $4.5$ & --- & --- \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\paragraph{Cost-Based Decision Rule, Overrides, and Contract Gate.} Let $C_{\text{miss}}$ ($1000$), $C_{\text{fb}}$ ($20$), and $C_{\text{hold}}$ ($5$) denote the operational costs of a missed attack, a false block, and a human hold, and let $h \in (0, 1]$ ($0.7$) denote the probability that a hold stops a real attack. Bayes minimal-risk decision theory (proved in Appendix~\ref{app:bayes}) yields exact log-odds thresholds:
+\begin{equation}
+  \tau_{\text{block}} = \ln\frac{C_{\text{fb}}}{C_{\text{miss}}} \approx -3.912, \qquad
+  \tau_{\text{hold}} = \ln\frac{C_{\text{hold}}}{h \cdot C_{\text{miss}}} \approx -4.942.
+  \label{eq:thresholds}
+\end{equation}
+Preceding the calculus, four deterministic overrides $\mathcal{O}$ apply in strict priority order: (1)~\texttt{OVR-SELF-TAMPER} $\mapsto \texttt{BLOCK}$, (2)~\texttt{OVR-CANARY} $\mapsto \texttt{BLOCK}$, (3)~\texttt{OVR-PROTECTED-ASSET} (labeled actor reading protected asset) $\mapsto \texttt{BLOCK}$, and (4)~\texttt{OVR-TRUSTED-ROOT} (unlabeled trusted origin) $\mapsto \texttt{ALLOW}$. When $\mathcal{O} = \varnothing$, the final decision $D(S)$ enforces the \textbf{Contract Gate} (Figure~\ref{fig:tikz_thresholds}):
+\begin{equation}
+  D(S) =
+  \begin{cases}
+    \texttt{BLOCK}, & \text{if } L(S) \ge \tau_{\text{block}} \;\land\; Q_{\text{contract}}(S),\\
+    \texttt{HOLD},  & \text{if } \big(L(S) \ge \tau_{\text{block}} \;\land\; \neg Q_{\text{contract}}(S)\big)\\
+                    & \quad\;\lor\; \big(\tau_{\text{hold}} \le L(S) < \tau_{\text{block}}\big),\\
+    \texttt{ALLOW}, & \text{if } L(S) < \tau_{\text{hold}}.
+  \end{cases}
+  \label{eq:decide}
+\end{equation}
+
+\subsection{Contract Surprisal and Good-Turing Maturity}
+\label{sec:rarity}
+
+During contract learning or baseline counting for role $r$, let $n_{r,e}$ denote the observed count of event behavior kind $e$, $N_r = \sum_{e=1}^{K_r} n_{r,e}$ the total observations over $K_r$ distinct seen kinds, and $n_{r,1} = |\{e : n_{r,e} = 1\}|$ the number of singleton kinds. With Laplace smoothing ($\alpha = 1$) reserving one pseudocount bin for all unseen behaviors ($K_r + 1$ bins total), the smoothed probability and Shannon surprisal are:
+\begin{equation}
+  \hat{p}(e \mid r) = \frac{n_{r,e} + \alpha}{N_r + \alpha(K_r + 1)}, \qquad
+  I(e \mid r) = -\log_2 \hat{p}(e \mid r) \;\text{(bits)}.
+  \label{eq:surprisal}
+\end{equation}
+To uphold Invariant~3.2, neither learned contracts nor \texttt{contract\_surprisal} ($I(e \mid r) \ge I_{\max} = 12$~bits) activate until the Good-Turing unseen probability mass falls below $\tau_{\text{mat}} = 0.01$:
+\begin{equation}
+  \hat{p}_{\text{unseen}}(r) = \frac{n_{r,1}}{N_r} < \tau_{\text{mat}}.
+  \label{eq:goodturing}
+\end{equation}
+
+\subsection{Dual-Window Statistical Rate and Drift Detectors}
+\label{sec:rates}
+
+Refmon monitors burst rates over both a short window ($60$~s) and a long window ($1$~h) so attackers cannot evade burst thresholds simply by spacing operations minutes apart:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Poisson Upper-Tail Burst Test (\texttt{mass\_change}, \texttt{lateral}, repeated \texttt{response\_anomaly}):} Given EMA baseline rate $\hat{\lambda}$ and $k$ distinct items in the active window, an alert fires iff
+  \begin{equation}
+    \mathbb{P}(X \ge k \mid X \sim \operatorname{Poisson}(\hat{\lambda})) = \sum_{i=k}^{\infty} \frac{e^{-\hat{\lambda}}\hat{\lambda}^i}{i!} < \alpha_{\text{pois}} = 10^{-6}.
+    \label{eq:poisson}
+  \end{equation}
+  \item \textbf{Standardized One-Sided CUSUM (\texttt{exfil} volume):} For role outbound byte volume $x_t$ with role mean $\mu_r$, standard deviation $\sigma_r$, standardized score $z_t = (x_t - \mu_r)/\sigma_r$, slack $k_c = 0.5$, and threshold $h_c = 5.0$:
+  \begin{equation}
+    S_t = \max\big(0,\, S_{t-1} + z_t - k_c\big), \qquad \text{alert iff } S_t > h_c.
+    \label{eq:cusum}
+  \end{equation}
+\end{enumerate}
+All EMA baselines $\hat{\lambda}_t = (1-\beta)\hat{\lambda}_{t-1} + \beta y_t$ freeze ($\text{frozen}=\texttt{true}$) whenever an incident on that process tree is open, preventing adversarial baseline poisoning.
+
+\subsection{Six-Engine Cross-View Rootkit Calculus}
+\label{sec:rootkit}
+
+To detect userland and kernel stealth implants without requiring root privileges, Refmon executes $m \ge 2$ passes separated by $\Delta \tau$ across six read-only engines: (E1)~dynamic linker hijacking (\texttt{/etc/ld.so.preload}, \texttt{LD\_PRELOAD}, \texttt{LD\_AUDIT}, ephemeral \texttt{LD\_LIBRARY\_PATH}, deleted or ephemeral shared libraries), (E2)~fileless execution and memory injection (\texttt{memfd:}, deleted \texttt{/proc/[pid]/exe} links, execution from \texttt{/dev/shm} or \texttt{/tmp}, non-zero \texttt{TracerPid}, anonymous \texttt{rwxp} segments), (E3)~LKM cross-view (\texttt{/sys/module} $\setminus$ \texttt{/proc/modules}) with kernel taint decoding (\texttt{/proc/sys/kernel/taint}: forced load or unload is scored, while the proprietary, out-of-tree and unsigned-module bits of GPU/DKMS drivers are recorded as context only), (E4)~PID cross-view (\texttt{/proc} enumeration versus thread groups and own-UID ancestry, without sending signals), (E5)~socket cross-view and sniffer check (\texttt{TCP: inuse} of \texttt{/proc/net/sockstat} versus the lines of \texttt{/proc/net/tcp}, and \texttt{IFF\_PROMISC} interfaces), and (E6)~an optional bridge to installed \texttt{unhide}, \texttt{chkrootkit} or \texttt{rkhunter}, where a missing tool adds no evidence.
+
+Persistent cross-view discrepancies are isolated by multi-pass set intersection:
+\begin{equation}
+  \Delta_{\text{pers}} = \bigcap_{r=1}^{m} \Big(\mathcal{V}_{\text{low}}^{(r)} \setminus \mathcal{V}_{\text{high}}^{(r)}\Big),
+  \label{eq:crossview_intersect}
+\end{equation}
+suppressing transient process/module churn exponentially in $m$ (Appendix~\ref{app:rootkit}). Confirmed discrepancies map to bounded log-odds evidence:
+\begin{equation}
+  w_{\text{rk}}(d, m) = \min\!\Big(w_{\max},\; \ln\frac{p_{\text{tp}}}{p_{\text{race}}} + (m - 1)\ln\frac{1}{q_{\text{persist}}}\Big),
+  \label{eq:rk_nats}
+\end{equation}
+The implementation treats passes as independent ($q_{\text{persist}} = p_{\text{race}} = 10^{-3}$, $p_{\text{tp}} = 0.99$, $w_{\max} = 8$~nats), so two passes already reach the cap; a cross-view finding counts with the larger of this weight and its base weight, and single-pass findings use fixed base weights (e.g.\ $2.2$~nats for anonymous \texttt{rwxp} memory, $5.2$ for \texttt{LD\_PRELOAD}). Findings are emitted as privacy-redacted \texttt{SECURITY\_TAMPER} or \texttt{EXEC} events directly into \texttt{Pipeline}.
+
+\subsection{Stages 5 \& 6 (\texttt{Gate}, \texttt{Contain}, \texttt{Exposure}, \texttt{Report})}
+\label{sec:gate}
+
+% 1-column TikZ Hold & Containment State Machine Shape Diagram
+\begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}[
+    font=\scriptsize\sffamily,
+    >=Latex,
+    st/.style={rectangle, rounded corners=4pt, draw=black!70, fill=gray!8, thick, minimum width=2.25cm, minimum height=0.62cm, align=center},
+    stbad/.style={rectangle, rounded corners=4pt, draw=red!70!black, fill=red!10, thick, minimum width=2.25cm, minimum height=0.62cm, align=center},
+    stgood/.style={rectangle, rounded corners=4pt, draw=green!55!black, fill=green!10, thick, minimum width=2.25cm, minimum height=0.62cm, align=center}
+  ]
+    \node[st, fill=yellow!18, draw=orange!75!black] (pend) at (0, 0) {\textbf{PENDING HOLD}\\(\texttt{pause} / \texttt{quarantine})};
+    \node[stgood] (rel) at (-2.35, -1.45) {\textbf{RELEASED}\\(Undo $\mathcal{U}$)};
+    \node[stbad] (cont) at (2.35, -1.45) {\textbf{CONTAINED}\\(Kill / Cut / Quar.)};
+    \node[st, fill=blue!8, draw=blue!65!black] (kept) at (0, -2.55) {\textbf{KEPT\_QUARANTINED}\\(Server Timeout)};
+
+    \draw[->, thick, green!50!black] (pend.south west) -- node[left, font=\tiny]{user \texttt{continue} / admin \texttt{release}} (rel.north);
+    \draw[->, thick, red!70!black] (pend.south east) -- node[right, font=\tiny]{\texttt{stop}, \texttt{confirm}, EP $t\!\ge\!T_{\text{ep}}$} (cont.north);
+    \draw[->, thick, blue!65!black] (pend.south) -- node[fill=white, inner sep=1pt, font=\tiny]{SRV $t \ge T_{\text{srv}}$} (kept.north);
+    \draw[->, thick, green!50!black] (kept.north west) -- node[below left, font=\tiny]{\texttt{release}} (rel.south east);
+    \draw[->, thick, red!70!black] (kept.north east) -- node[below right, font=\tiny]{\texttt{confirm}} (cont.south west);
+  \end{tikzpicture}
+  \caption{Dual endpoint vs.\ server hold state machine in \texttt{Gate}. Endpoint timeouts fail closed into containment, whereas unattended server holds preserve service stability in \texttt{KEPT\_QUARANTINED} until an administrator decides.}
+  \label{fig:tikz_hold_fsm}
+\end{figure}
+
+Figure~\ref{fig:tikz_hold_fsm} illustrates \texttt{Gate}'s mode-aware enforcement (\texttt{observe} logs only; \texttt{warn} notifies without blocking; \texttt{block} enforces). Containment actions (\texttt{kill\_process\_tree}, \texttt{cut\_network}, \texttt{quarantine\_file} moving files with mode \texttt{0400} without deletion, \texttt{revert\_persistence}, \texttt{restore\_file}) target exclusively labeled entities (or signal-producing non-channel processes on unlabeled stories, \texttt{v1.2} A51--A52) and carry reversible undo tokens $\mathcal{U}$. Concurrently, the \texttt{Exposure} stage matches local software inventories against CVE advisories, automatically escalating exposed or end-of-life roles to \texttt{block} mode with strict outbound network confinement (\emph{virtual patching}) until patched.
+
+For fleet-wide reporting, per-device aggregate counts add calibrated Laplace noise $\tilde{c} = c + \operatorname{Lap}(1/\varepsilon)$, dashboard cohorts with fewer than $k = 5$ devices are suppressed, and pseudonym re-identification requires cryptographic four-eyes approval from two distinct human operators recorded on a hash-chained tamper-evident audit log.
+
+% ============================================================================
+% 4. EXPERIMENTS, ALGORITHMS, AND IMPLEMENTATION TESTS
+% ============================================================================
+\section{Experiments, Algorithms, and Implementation Tests}
+\label{sec:eval}
+
+\subsection{Reference Implementation and Signed Policy Governance}
+\label{sec:impl}
+
+Refmon is implemented in approximately 12,000 lines of strict, type-checked Python~3.12 (\texttt{pydantic} v2 frozen schemas, \texttt{cryptography} Ed25519 signatures, zero runtime machine-learning dependencies). Every threshold, weight, role contract, canary, and rate parameter resides in a canonical JSON-serialized, Ed25519-signed \texttt{policy.yaml}; startup and live reload reject any unsigned or tampered policy (\texttt{PolicyRejected}) and retain the last verified state. A periodic \texttt{SelfTest} scheduler clones the live pipeline via \texttt{pipeline.probe()} (preserving live disabled rules and weights while isolating outputs) to inject synthetic health stories and raise immediate alerts if any enabled protection fails to reach its expected decision.
+
+\subsection{Core Pipeline and Scanner Algorithms}
+\label{sec:algorithms}
+
+Algorithms~\ref{alg:pipeline}, \ref{alg:judge}, and~\ref{alg:rootkit} specify the exact deterministic execution of the Refmon event loop, the monotone Bayesian \texttt{Judge}, and the multi-pass cross-view rootkit sensor. Listing~\ref{lst:barrier} shows the core unprivileged command-barrier enforcement loop from \texttt{src/refmon/live.py}.
+
+\begin{algbox}{End-to-End Refmon Event Processing (\texttt{Pipeline.process})}{alg:pipeline}
+  \item \textbf{Input:} Sensor event $e_{\text{raw}} \in \texttt{RawEvent} \cup \texttt{Event}$, verified policy $\Pi$, device HMAC key $K_{\text{dev}}$.
+  \item \textbf{Output:} Emitted verdicts and containment actions $\mathcal{V} \subseteq \texttt{Verdict} \cup \texttt{Action}$.
+  \item $e \leftarrow \textsc{Observe}(e_{\text{raw}}, \Pi, K_{\text{dev}})$ \hfill $\triangleright$ Compute $\text{HMAC}_{K_{\text{dev}}}$, $H(c)$, Bloom+Exact check; drop raw content
+  \item $p_{\text{known}} \leftarrow (e.\text{actor.parent} \in \text{Tagger.procs})$
+  \item $\text{tg} \leftarrow \textsc{Tag}(e, \Pi)$ \hfill $\triangleright$ Apply propagation rules 1--7, decay $2^{-\Delta t / T_{1/2}}$, Noisy-OR
+  \item $(\mathcal{S}, \mathcal{F}) \leftarrow \textsc{ExtractSignals}(e, \text{tg}, \Pi, \text{Rates}, \text{Baseline})$
+  \item $\text{rec} \leftarrow \textsc{Link}(\text{tg}, p_{\text{known}}, \mathcal{S}, \mathcal{F}, \Pi)$ \hfill $\triangleright$ Assign/merge story within quiet window $W_q$
+  \item $J \leftarrow \textsc{Judge}(\text{rec}, \text{Tagger}, \Pi)$ \hfill $\triangleright$ Algorithm~\ref{alg:judge}
+  \item $\text{Rates.mark\_incident}(\text{root}(e.\text{actor}),\, J.\text{decision} \neq \texttt{ALLOW})$ \hfill $\triangleright$ Freeze EMA baselines during incident
+  \item \textbf{if} $\{s \in J.\text{signals} : s.\text{question}=\text{contract} \land \neg s.\text{carried}\} \neq \varnothing$ \textbf{then}
+  \item \hspace{1.0em} Freeze decay and attach contract evidence to active labels $\ell \in \text{rec.label\_ids}$
+  \item $\mathcal{V} \leftarrow \textsc{EmitVerdictIfChanged}(\text{rec}, J)$
+  \item \textbf{if} $\text{Gate} \neq \texttt{None}$ \textbf{then} $\mathcal{V} \leftarrow \text{Gate.tick}(e.\text{ts}) \,\|\, \mathcal{V} \,\|\, \text{Gate.handle}(\text{rec}, J, e.\text{ts})$
+  \item \textbf{return} $\mathcal{V}$
+\end{algbox}
+
+\begin{algbox}{Monotone Question-Grouped Bayesian Judge (\texttt{v1.3})}{alg:judge}
+  \item \textbf{Input:} Story record $\text{rec}$, provenance tagger $\mathcal{T}$, signed policy $\Pi$.
+  \item \textbf{Output:} Story judgement $J = (\text{decision}, L, \text{failed}, \text{override}, \text{gated})$.
+  \item $s_{\text{ori}} \leftarrow \max_{\ell \in \text{rec.label\_ids}} \mathcal{T}.\text{strength}(\ell, \text{rec.last\_ts})$; \quad $\text{labeled} \leftarrow (s_{\text{ori}} \ge \Pi.\theta_{\text{ori}}) \land \Pi.\text{enabled}(\texttt{R-ORI})$
+  \item Filter $\mathcal{S} \leftarrow \{s \in \text{rec.signals} : (\neg s.\text{allowed} \lor \text{labeled}) \land \Pi.\text{rule\_enabled}(s) \land s \notin \Pi.\text{exceptions}\}$
+  \item Append persistent carried contract signals from $\{\ell \in \text{rec.label\_ids} : s_\ell \ge \Pi.\theta_{\text{ori}}\}$
+  \item Check priority overrides $\mathcal{O}$: \texttt{self\_tamper} $\succ$ \texttt{canary} $\succ$ \texttt{protected\_asset} $\mapsto \texttt{BLOCK}$; unlabeled \texttt{trusted} $\mapsto \texttt{ALLOW}$
+  \item \textbf{if} $\mathcal{O} \neq \texttt{None}$ \textbf{then return} forced override decision with audit trace
+  \item $\mathcal{E} \leftarrow \{(s.\text{question}, s.\text{name}, 1.0) : s \in \mathcal{S}\}$ \hfill $\triangleright$ \texttt{v1.3}: unit strength for Contract \& Effect
+  \item \textbf{if} $\text{labeled}$ \textbf{then} $\mathcal{E} \leftarrow \mathcal{E} \cup \{(\text{origin}, \texttt{origin\_external}, s_{\text{ori}})\}$
+  \item $L \leftarrow \ln\frac{\Pi.\pi}{1 - \Pi.\pi} + \sum_{q \in \{\text{ori},\text{con},\text{eff}\}} \max_{(q, j, s_j) \in \mathcal{E}} (\Pi.w_j \cdot s_j)$
+  \item $\tau_b \leftarrow \ln(\Pi.C_{\text{fb}} / \Pi.C_{\text{miss}})$; \quad $\tau_h \leftarrow \ln(\Pi.C_{\text{hold}} / (\Pi.h \cdot \Pi.C_{\text{miss}}))$; \quad $C_{\text{fail}} \leftarrow \exists s \in \mathcal{S}: s.\text{question}=\text{contract}$
+  \item \textbf{if} $L \ge \tau_b \land C_{\text{fail}}$ \textbf{then return} $(\texttt{BLOCK}, L, \text{gated}=\texttt{false})$
+  \item \textbf{else if} $L \ge \tau_b \land \neg C_{\text{fail}}$ \textbf{then return} $(\texttt{HOLD}, L, \text{gated}=\texttt{true})$ \hfill $\triangleright$ Contract Gate
+  \item \textbf{else if} $L \ge \tau_h$ \textbf{then return} $(\texttt{HOLD}, L, \text{gated}=\texttt{false})$
+  \item \textbf{else return} $(\texttt{ALLOW}, L, \text{gated}=\texttt{false})$
+\end{algbox}
+
+\begin{algbox}{Multi-Pass 6-Engine Read-Only Rootkit Cross-View Sensor}{alg:rootkit}
+  \item \textbf{Input:} Pass count $m \ge 2$, interval $\Delta\tau$, own UID $u$, signed policy $\Pi$.
+  \item \textbf{Output:} Structured \texttt{RootkitScanReport} with posterior $L_{\text{rk}}$ and decision $D_{\text{rk}}$.
+  \item $\mathcal{F}_{\text{single}} \leftarrow \textsc{ScanPreloadAndMemfdAndMaps}(u) \cup \textsc{ScanTaintAndPromisc}()$
+  \item \textbf{for} $r = 1 \dots m$ \textbf{do}
+  \item \hspace{1.0em} $\Delta_{\text{mod}}^{(r)} \leftarrow \textsc{SysfsModules}() \setminus \textsc{ProcModules}()$ \hfill $\triangleright$ Engine 4: Hidden LKM check
+  \item \hspace{1.0em} $\Delta_{\text{pid}}^{(r)} \leftarrow \textsc{DirectOwnPidProbe}(u) \setminus \textsc{ProcReaddirPids}()$ \hfill $\triangleright$ Engine 6: Hidden PID check
+  \item \hspace{1.0em} \textbf{if} $r < m$ \textbf{then} sleep($\Delta\tau$)
+  \item $\Delta_{\text{mod}}^* \leftarrow \bigcap_{r=1}^{m} \Delta_{\text{mod}}^{(r)}$; \quad $\Delta_{\text{pid}}^* \leftarrow \bigcap_{r=1}^{m} \Delta_{\text{pid}}^{(r)}$ \hfill $\triangleright$ Suppress transient churn
+  \item Map $\mathcal{F} \leftarrow \mathcal{F}_{\text{single}} \cup \textsc{Findings}(\Delta_{\text{mod}}^*, \Delta_{\text{pid}}^*)$ to log-odds $L_{\text{rk}} = L_0 + \sum_{f \in \mathcal{F}} w_{\text{rk}}(f, m)$
+  \item Evaluate $D_{\text{rk}} \leftarrow \textsc{Decide}(L_{\text{rk}}, \tau_b, \tau_h, \text{override}=\texttt{SELF\_TAMPER if } \exists f.\text{self\_tamper})$
+  \item \textbf{return} $\texttt{RootkitScanReport}(\mathcal{F}, L_{\text{rk}}, D_{\text{rk}})$
+\end{algbox}
+
+\begin{lstlisting}[language=Python,style=refmoncode,caption={Core unprivileged user-space command barrier loop (excerpted from \texttt{src/refmon/live.py}).},label={lst:barrier}]
+story_id, j = self._feed_raw_events(raw_events)  # Observe -> Tag -> Link -> Judge -> Gate
+lo = float(j.log_odds if j.log_odds is not None else 0.0)
+blocked_by_barrier = (
+    self.policy.mode is Mode.BLOCK
+    and j.decision in (Decision.BLOCK, Decision.HOLD)
+)
+if execute and not blocked_by_barrier and j.decision is Decision.ALLOW:
+    proc = subprocess.run(cmd, shell=True, cwd=str(self.workspace_dir),
+                          capture_output=True, text=True, timeout=5.0, check=False)
+\end{lstlisting}
+
+\subsection{Golden Catalog and Seeded Mutation Robustness}
+\label{sec:golden_results}
+
+\paragraph{Strict Pre-Registration Protocol.} All weights (Table~\ref{tab:weights}) and structural rules were fixed prior to catalog evaluation. Robustness across four successive specification tags (\texttt{v1.0} through \texttt{v1.3}) is measured on 879 event-stream variants mutated along six orthogonal dimensions (delivery channel, launcher entry, obfuscation, network destination, process lineage depth, and inter-event timing) generated from pre-registered seed \texttt{654514256} (SHA-256 stream digest \texttt{5c3fcbeb...}), guaranteeing identical input streams across versions.
+
+\begin{table*}[!t]
+  \centering
+  \caption{Robustness Evaluation Across Specification Versions \texttt{v1.0}--\texttt{v1.3} on 46 Golden Scenarios and 879 Seeded Variants (Seed \texttt{654514256}), with Wilson 95\% Confidence Intervals~\cite{wilson1927probable} and Paired Exact McNemar Tests~\cite{mcnemar1947note}.}
+  \label{tab:results_matrix}
+  \small
+  \begin{tabular}{@{}lrrrr@{}}
+    \toprule
+    \textbf{Evaluation Metric / Benchmark Partition} & \textbf{\texttt{v1.0} (Frozen)} & \textbf{\texttt{v1.1} (A46--A50)} & \textbf{\texttt{v1.2} (A51--A54)} & \textbf{\texttt{v1.3} (Monotone)} \\
+    \midrule
+    Golden Catalog Scenarios Matching Expected Decision ($N = 46$) & $46/46$ ($100.0\%$) & $46/46$ ($100.0\%$) & $46/46$ ($100.0\%$) & \textbf{$46/46$ ($100.0\%$)} \\
+    \midrule
+    \textbf{Malicious Variants ($N = 633$)} & & & & \\
+    \quad Blocked outright & $425$ ($67.1\%$) & $467$ ($73.8\%$) & $467$ ($73.8\%$) & \textbf{$486$ ($76.8\%$)} \\
+    \quad Effective Hold (process paused / file quarantined) & $121$ ($19.1\%$) & $157$ ($24.8\%$) & $157$ ($24.8\%$) & $139$ ($22.0\%$) \\
+    \quad Contained = Block + Effective Hold [Wilson 95\% CI] & $86.3\%$ [$83.4, 88.7$] & $98.6\%$ [$97.3, 99.3$] & $98.6\%$ [$97.3, 99.3$] & \textbf{$98.7\%$ [$97.5, 99.4$]} \\
+    \quad Caught = Block + Any Hold [Wilson 95\% CI] & $97.2\%$ [$95.6, 98.2$] & $98.6\%$ [$97.3, 99.3$] & $98.6\%$ [$97.3, 99.3$] & \textbf{$98.7\%$ [$97.5, 99.4$]} \\
+    \quad Uncontained: Hold that paused nothing & $69$ & $0$ & $0$ & \textbf{$0$} \\
+    \quad Uncontained: Allowed malicious variants (Gaps G1--G3) & $18$ & $9$ & $9$ & \textbf{$8$} \\
+    \quad Blocks that acted on nothing (unlabeled fallback gap) & $11$ & $9$ & $0$ & \textbf{$0$} \\
+    \midrule
+    \textbf{Independent Seed-Decided Malicious Subset ($N = 322$)} & & & & \\
+    \quad Contained (Block + Effective Hold) & $269/322$ ($83.5\%$) & $313/322$ ($97.2\%$) & $313/322$ ($97.2\%$) & \textbf{$314/322$ ($97.5\%$)} \\
+    \midrule
+    \textbf{Neutral Benign Variants ($N = 151$, False-Alarm Test)} & & & & \\
+    \quad Allowed / Held / False-Blocked & $126$ / $22$ / $3$ & $126$ / $22$ / $3$ & $126$ / $22$ / $3$ & $125$ / $23$ / $3$ \\
+    \quad Neutral False-Block Rate [Wilson 95\% CI] & $2.0\%$ [$0.7, 5.7$] & $2.0\%$ [$0.7, 5.7$] & $2.0\%$ [$0.7, 5.7$] & \textbf{$2.0\%$ [$0.7, 5.7$]} \\
+    \midrule
+    \textbf{Paired McNemar Exact Test vs.\ \texttt{v1.3} (Malicious, $N = 633$)} & & & & \\
+    \quad Contained: $(\text{only baseline},\, \text{only \texttt{v1.3}})$, exact $p$-value & $(0, 79),\; p = 3.3\!\times\!10^{-24}$ & $(0, 1),\; p = 1.0$ & $(0, 1),\; p = 1.0$ & --- \\
+    \quad Blocked: $(\text{only baseline},\, \text{only \texttt{v1.3}})$, exact $p$-value & $(0, 61),\; p = 8.7\!\times\!10^{-19}$ & $(0, 19),\; p = 3.8\!\times\!10^{-6}$ & $(0, 19),\; p = 3.8\!\times\!10^{-6}$ & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+Table~\ref{tab:results_matrix} summarizes the progression from \texttt{v1.0} to \texttt{v1.3}. All 46 golden scenarios across all 17 attack families reach their exact expected decisions ($100\%$). Across the 633 malicious variants, fixing hold containment on unlabeled signal-producing processes (\texttt{v1.1}--\texttt{v1.2}) eliminated all 69 ``holds that paused nothing'' and all 11 ``blocks that acted on nothing,'' raising active containment from $86.3\%$ to $98.7\%$ ($p = 3.3 \times 10^{-24}$). Enforcing monotonicity in \texttt{v1.3} converted 19 faded-label holds into decisive blocks ($p = 3.8 \times 10^{-6}$ vs.\ \texttt{v1.2}) while keeping the false-block rate on neutral benign mutations unchanged at $2.0\%$ ($3/151$).
+
+\subsection{Live Cluster Barrier, 16-Scenario Suite, and Rootkit Tests}
+\label{sec:cluster_eval}
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/refmon_cluster_deployment.jpg}
+  \caption{Multi-tier deployment architecture and host integrity verification: (a)~unprivileged user-space command barrier (\texttt{refmon guard}) and watched staging directories (\texttt{web\_root} $\to$ \texttt{quarantine/} mode \texttt{0400}) alongside optional kernel eBPF/LSM sensors; (b)~six-engine two-pass cross-view rootkit sensor feeding bounded log-odds into the Bayesian decision judge.}
+  \label{fig:cluster_deployment}
+\end{figure*}
+
+Figure~\ref{fig:cluster_deployment} illustrates how Refmon operates on shared Linux HPC nodes where researchers lack \texttt{root} privileges. The background daemon (\texttt{refmon serve}) bootstraps an Ed25519 keypair, verifies \texttt{policy.yaml} in \texttt{block} mode, watches user-space staging directories every $400$~ms, and exposes a minimal white-theme local telemetry dashboard. Because every user of a shared node can reach a localhost port, every API call must carry a random per-daemon token kept in the owner-only (\texttt{0700}) work directory, requests whose \texttt{Host} header is not local are refused (DNS rebinding), and Observe fingerprints are keyed with a random per-device key stored next to it. Table~\ref{tab:live_suite} reports the live 16-scenario verification suite ($16/16 = 100\%$ expected verdicts): ClickFix lures are halted prior to shell execution ($\texttt{executed=False}$), dropped PHP web shells are automatically quarantined within $< 500$~ms with \texttt{0400} permissions, 55-file ransomware bursts trigger \texttt{mass\_change} blocks, canary/tamper tripwires trigger instant overrides, and benign local or PyPI operations execute cleanly with zero false alarms. In synthetic and live host tests (13 unit tests in \texttt{test\_rootkit.py}), the six-engine rootkit scanner suppresses benign NVIDIA/out-of-tree GPU kernel taints ($L = -6.91 \mapsto \texttt{ALLOW}$), holds lone JIT-like anonymous \texttt{rwxp} regions ($L = -4.71 \mapsto \texttt{HOLD}$), and blocks \texttt{LD\_PRELOAD}, \texttt{memfd}, hidden LKMs, and hidden PIDs ($L \ge -2.51 \mapsto \texttt{BLOCK}$).
+
+\begin{table}[!t]
+  \centering
+  \caption{Live Barrier 16-Scenario Verification Suite (\texttt{mode=block}).}
+  \label{tab:live_suite}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{@{}llrrl@{}}
+    \toprule
+    \textbf{Scenario Type} & \textbf{Origin / Role} & \textbf{Q-Fails} & \textbf{$L$ (nats)} & \textbf{Verdict} \\
+    \midrule
+    ClickFix Paste (\texttt{curl|sh}) & \texttt{web} / \texttt{shell} & $3/3$ & $-0.61$ & \texttt{BLOCK} \\
+    Obfuscated Base64 Mail & \texttt{mail} / \texttt{shell} & $3/3$ & $-3.11$ & \texttt{BLOCK} \\
+    AI Prompt-Injection Abuse & \texttt{agent\_in} / \texttt{agent} & $3/3$ & $-0.11$ & \texttt{BLOCK} \\
+    Protected Credential Theft & \texttt{mail} / \texttt{shell} & OVR & $-1.61$ & \texttt{BLOCK} \\
+    Server Web Worker RCE & \texttt{req\_in} / \texttt{web} & $3/3$ & $-0.61$ & \texttt{BLOCK} \\
+    Web Shell Drop (\texttt{.php}) & \texttt{req\_in} / \texttt{web} & $3/3$ & $-0.11$ & \texttt{BLOCK+QUAR} \\
+    Ransomware 55-File Burst & local / \texttt{shell} & $2/3$ & $-2.41$ & \texttt{BLOCK} \\
+    Decoy Canary Credential & \texttt{web} / \texttt{shell} & OVR & $-1.61$ & \texttt{BLOCK} \\
+    SUID / \texttt{sudo} Escalation & \texttt{dl} / \texttt{shell} & $3/3$ & $-2.61$ & \texttt{BLOCK} \\
+    Crontab / \texttt{.bashrc} Persist & \texttt{web} / \texttt{shell} & $3/3$ & $-2.61$ & \texttt{BLOCK} \\
+    Security Tamper (\texttt{pkill}) & local / \texttt{shell} & OVR & $-1.91$ & \texttt{BLOCK} \\
+    Supply-Chain Post-Install & \texttt{pkg} / \texttt{installer} & $3/3$ & $+1.89$ & \texttt{BLOCK} \\
+    \midrule
+    Unverified Mirror Fetch & local / \texttt{shell} & $1/3$ & $-4.41$ & \texttt{HOLD} \\
+    \midrule
+    Benign Local \texttt{ls -la} & local / \texttt{shell} & $0/3$ & $-6.91$ & \texttt{ALLOW} \\
+    Benign Pasted \texttt{echo} & \texttt{web} / \texttt{shell} & $2/3$ & $-5.11$ & \texttt{ALLOW} \\
+    Trusted PyPI Download & \texttt{dl} / \texttt{installer} & OVR & $-6.91$ & \texttt{ALLOW} \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\subsection{Adversarial Privacy Audit and Test Suite Summary}
+\label{sec:privacy_eval}
+
+Running \texttt{refmon audit} executes an active red-team privacy audit across all generated verdicts, reports, stories, buffered events, learning proposals, and golden files:
+\begin{itemize}[leftmargin=1.3em,itemsep=1pt,topsep=2pt]
+  \item \textbf{Cleartext Leakage:} $264$ output artefacts scanned $\to$ \textbf{$0$ raw content findings}.
+  \item \textbf{Dictionary HMAC Attack:} $349$ fingerprints attacked across $2,119$ common command/URL guesses without $K_{\text{dev}}$ $\to$ \textbf{$0$ reversals} (whereas a positive control given $K_{\text{dev}}$ reverses $6/6$, confirming attack-harness validity).
+  \item \textbf{Four-Eyes Escrow:} $10$ single-approver re-identification attempts $\to$ \textbf{$0$ permitted}; dual-approver requests succeed with hash-chain integrity verified ($\texttt{audit chain intact = True}$).
+  \item \textbf{Automated Verification:} Across unit, Hypothesis property-based, golden replay, rootkit, CLI, and live HTTP tests, over $1,640$ automated tests pass.
+\end{itemize}
+
+% ============================================================================
+% 5. DISCUSSION
+% ============================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Why Consequence-Oriented Contracts Generalize to Unseen Zero-Days}
+Exploit techniques evolve rapidly, yet post-compromise objectives remain tightly constrained by operating-system semantics. Whether a web worker is compromised through a classic PHP file inclusion, a novel HTTP/3 heap overflow, or an unsafe Node.js deserialization gadget (\texttt{S13}, \texttt{S25}, \texttt{S26b--c}), spawning an interactive shell or writing an executable script into a web root violates the invariant contract of that worker role (\texttt{may\_exec: []}). Simultaneously, evaluating Origin and Effect alongside Contract prevents rigid MAC brittleness: when a developer copies a benign diagnostic command (\texttt{echo} or \texttt{git status}, Scenario~\texttt{S11}) from documentation, Origin ($+0.8$~nats) and Contract ($+1.0$~nats) fire, reaching $L = -5.11$~nats---safely below $\tau_{\text{hold}} = -4.94$~nats and avoiding alert fatigue.
+
+\subsection{Discovery and Resolution of the Non-Monotonicity Flaw (Finding F8)}
+Pre-registered mutation testing revealed a subtle mathematical pathology in versions prior to \texttt{v1.3}. Earlier versions scaled Contract and Effect signals by $s_{\text{ori}}$ whenever $s_{\text{ori}} \ge \theta_{\text{ori}} = 0.5$, while reverting to unit strength ($1.0$) when $s_{\text{ori}} < 0.5$ so unlabeled local breaches could still be caught. Consequently, a provenance label decaying from $s_{\text{ori}} = 0.70$ to $0.49$ abruptly \emph{increased} a Contract signal's contribution from $0.70 w_j$ to $1.00 w_j$---violating evidence monotonicity. Decoupling Contract and Effect strengths ($s_j \equiv 1$) from Origin's continuous decay in \texttt{v1.3} restored global monotonicity (proved in Appendix~\ref{app:monotone}) and upgraded 19 faded-label attack variants from \texttt{HOLD} to \texttt{BLOCK} ($p = 3.8 \times 10^{-6}$) without increasing neutral false blocks.
+
+\subsection{Documented Architectural Boundaries and Residual Gaps}
+Refmon explicitly documents four fundamental limits rather than masking them behind overfitted weights:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Unobserved Out-of-Band Channels (\texttt{S05}):} If a user manually types a malicious command viewed on a separate phone screen or video call, no digital \texttt{content\_in} event occurs on the host. With $Q_{\text{origin}}$ absent, \texttt{effect\_fetch} ($+2.5$~nats) raises $L$ to $-4.41 \ge \tau_{\text{hold}}$, pausing the process for human confirmation (\texttt{HOLD}) rather than silently allowing or blindly blocking.
+  \item \textbf{In-Contract Data Abuse (\texttt{S22}):} SQL injection that reads records strictly over the web application's already-permitted database socket violates no process or network contract; Refmon catches such attacks only when response sizes trigger \texttt{response\_anomaly\_repeated} (\texttt{S27}), outbound volume trips CUSUM (\texttt{exfil}), or decoy records trigger \texttt{OVR-CANARY} (\texttt{S08}).
+  \item \textbf{Residual Mutation Gaps (\texttt{G1}--\texttt{G3}):} Exactly $8/633$ ($1.3\%$) mutated malicious streams remain uncontained in \texttt{v1.3}: unlabeled actors connecting to broadly trusted host classes (\texttt{G1}, mitigated by keeping \texttt{trusted: true} destination lists narrow) and ultra-slow ransomware mutations modifying $< 55$ total files spaced minutes apart across quiet windows (\texttt{G2}--\texttt{G3}).
+  \item \textbf{User-Space vs.\ Kernel Deployment:} In unprivileged user space on shared HPC nodes, Refmon mediates commands routed through \texttt{refmon guard}, watched staging directories, and user-readable \texttt{/proc}/\texttt{/sys} views. Full non-bypassability against a local attacker who invokes raw syscalls directly requires administrative deployment of kernel-level sensors.
+\end{enumerate}
+
+% ============================================================================
+% 6. FUTURE WORK
+% ============================================================================
+\section{Future Work}
+\label{sec:future}
+
+Five directions extend Refmon toward production campus and HPC deployments:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Kernel-Enforced Linux \texttt{eBPF} LSM and \texttt{fanotify} Adapters (Phase~8):} Implementing non-bypassable kernel sensors hooking \texttt{bprm\_check\_security}, \texttt{socket\_connect}, and \texttt{file\_permission} behind Refmon's frozen \texttt{Sensor.emit} and \texttt{Enforcer.act} interfaces, enabling synchronous kernel-level \texttt{HOLD}/\texttt{BLOCK} across all system processes without modifying a single line of core pipeline code.
+  \item \textbf{Distributed HPC Cluster \& Batch-Scheduler Provenance:} Propagating HMAC provenance labels and role contracts across multi-node Slurm/PBS batch jobs and SSH/MPI launches so lateral movement across compute nodes is linked into unified cross-node stories under $\varepsilon$-differential privacy.
+  \item \textbf{Multi-Scale Sub-Threshold CUSUM for Ultra-Slow Ransomware:} Addressing residual gaps \texttt{G2}--\texttt{G3} by tracking cumulative file-entropy shifts and directory-traversal surprisal over multi-day horizons.
+  \item \textbf{Hardware-Backed Policy Signing \& Verifiable Logs:} Binding Ed25519 policy keys and device HMAC keys to TPM~2.0 / HSM hardware roots of trust so even a privileged host compromise cannot forge policy weakenings or retroactively rewrite hash-chained audit ledgers.
+  \item \textbf{Longitudinal University Pilot (Phase~9):} Measuring real-world weekly hold rates per user, service-desk resolution times, per-syscall latency overhead, and contract-learning convergence across heterogeneous research workstations and web services.
+\end{enumerate}
+
+% ============================================================================
+% 7. CONCLUSION
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented \textbf{Refmon} (\emph{Provenance Gate v2}, tag \texttt{v1.3}), a deterministic, privacy-preserving reference monitor that unifies dynamic provenance tracking, cryptographically signed role contracts, six-engine cross-view rootkit inspection, and cost-sensitive Bayesian log-odds calculus. By stripping raw payloads at an in-memory \texttt{Observe} boundary and judging causal stories through three interpretable questions---Origin, Contract, and Effect---Refmon stops ClickFix social-engineering pastes, zero-day server RCEs, web shells, ransomware bursts, AI prompt-injection tool abuse, and stealth preload/LKM rootkits without machine-learning opacity or cleartext telemetry collection. Across 46 golden scenarios, 879 pre-registered mutation variants, and live unprivileged cluster barrier testing, Refmon achieves 100\% golden accuracy, 98.7\% mutated attack containment, a 2.0\% neutral false-block rate, and provable mathematical guarantees on monotonicity, Bayes risk optimality, and zero raw data leakage.
+
+% ============================================================================
+% 8. AI DISCLOSURE
+% ============================================================================
+\section{AI Disclosure}
+\label{sec:ai_disclosure}
+
+In accordance with academic transparency and research-integrity standards, the authors disclose the structured use of generative AI coding and research assistants during the development, verification, and documentation of Refmon:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+  \item \textbf{Phased Implementation Under Human Specification:} Core pipeline modules (\texttt{Phases 0--7}, tags \texttt{v1.0}--\texttt{v1.3}) were developed iteratively using \emph{Anthropic Claude Code} governed by a human-authored specification (\texttt{CLAUDE.md}). Every phase required deterministic unit tests, Hypothesis property-based tests, and human review prior to progression. Crucially, \textbf{no AI or machine-learning model exists inside the Refmon runtime}: all runtime security decisions are purely deterministic mathematical functions of counted baselines and signed policy parameters.
+  \item \textbf{Extended Rootkit Sensor, Cluster Barrier, and Manuscript Preparation:} \emph{Google DeepMind Antigravity} assisted in engineering the six-engine read-only cross-view rootkit scanner (\texttt{src/refmon/rootkit.py}), the unprivileged live cluster barrier and light-theme telemetry interface (\texttt{src/refmon/live.py}, \texttt{src/refmon/live\_ui.py}), their integration test suites (\texttt{tests/test\_rootkit.py}, \texttt{tests/test\_live.py}), architectural diagrams, and the LaTeX typesetting of this manuscript and its mathematical proofs.
+  \item \textbf{Safeguards Against Overfitting and Hallucination:} All signal weights were frozen prior to benchmark runs; mutation evaluations (\texttt{v1.0}--\texttt{v1.3}) used pre-registered random seeds committed before structural changes; cryptographic policy keys remain exclusively human-held; and every theorem, equation, and empirical figure in this paper was verified against executable code and reproducible test outputs (\texttt{make reproduce}, \texttt{pytest}, and \texttt{refmon audit}).
+\end{enumerate}
+
+% ============================================================================
+% REFERENCES
+% ============================================================================
+\begin{thebibliography}{99}\small
+
+\bibitem{anderson1972computer}
+J.~P. Anderson, ``Computer security technology planning study,'' Electronic Systems Division, Air Force Systems Command, Tech. Rep. ESD-TR-73-51, Vol.~II, Oct. 1972.
+
+\bibitem{denning1976lattice}
+D.~E. Denning, ``A lattice model of secure information flow,'' \emph{Communications of the ACM}, vol.~19, no.~5, pp.~236--243, May 1976.
+
+\bibitem{wald1945sequential}
+A.~Wald, ``Sequential tests of statistical hypotheses,'' \emph{The Annals of Mathematical Statistics}, vol.~16, no.~2, pp.~117--186, Jun. 1945.
+
+\bibitem{page1954continuous}
+E.~S. Page, ``Continuous inspection schemes,'' \emph{Biometrika}, vol.~41, no.~1/2, pp.~100--115, Jun. 1954.
+
+\bibitem{lorden1971procedures}
+G.~Lorden, ``Procedures for reacting to a change in distribution,'' \emph{The Annals of Mathematical Statistics}, vol.~42, no.~6, pp.~1897--1908, Dec. 1971.
+
+\bibitem{good1953population}
+I.~J. Good, ``The population frequencies of species and the estimation of population parameters,'' \emph{Biometrika}, vol.~40, no.~3/4, pp.~237--264, Dec. 1953.
+
+\bibitem{pearl1988probabilistic}
+J.~Pearl, \emph{Probabilistic Reasoning in Intelligent Systems: Networks of Plausible Inference}. San Mateo, CA: Morgan Kaufmann, 1988.
+
+\bibitem{bloom1970space}
+B.~H. Bloom, ``Space/time trade-offs in hash coding with allowable errors,'' \emph{Communications of the ACM}, vol.~13, no.~7, pp.~422--426, Jul. 1970.
+
+\bibitem{bellare1996keying}
+M.~Bellare, R.~Canetti, and H.~Krawczyk, ``Keying hash functions for message authentication,'' in \emph{Advances in Cryptology --- CRYPTO '96}, LNCS vol.~1109, pp.~1--15, Springer, 1996.
+
+\bibitem{bernstein2012high}
+D.~J. Bernstein, N.~Duif, T.~Lange, P.~Schwabe, and B.-Y. Yang, ``High-speed high-security signatures,'' \emph{Journal of Cryptographic Engineering}, vol.~2, no.~2, pp.~77--89, Sep. 2012.
+
+\bibitem{dwork2006calibrating}
+C.~Dwork, F.~McSherry, K.~Nissim, and A.~Smith, ``Calibrating noise to sensitivity in private data analysis,'' in \emph{Proc. Theory of Cryptography Conf. (TCC)}, LNCS vol.~3876, pp.~265--284, Springer, 2006.
+
+\bibitem{sweeney2002kanonymity}
+L.~Sweeney, ``$k$-anonymity: A model for protecting privacy,'' \emph{Int. J. Uncertainty, Fuzziness and Knowledge-Based Systems}, vol.~10, no.~5, pp.~557--570, Oct. 2002.
+
+\bibitem{newsome2005dynamic}
+J.~Newsome and D.~X. Song, ``Dynamic taint analysis for automatic detection, analysis, and signature generation of exploits on commodity software,'' in \emph{Proc. NDSS}, Feb. 2005.
+
+\bibitem{pasquier2017practical}
+T.~Pasquier, X.~Han, M.~Goldstein, T.~Moyer, D.~Eyers, M.~Seltzer, and J.~Bacon, ``Practical whole-system provenance capture,'' in \emph{Proc. ACM SoCC}, pp.~405--418, Sep. 2017.
+
+\bibitem{hossain2017sleuth}
+M.~N. Hossain, S.~M. Milajerdi, J.~Wang, B.~Eshete, R.~Gjomemo, R.~Sekar, S.~Stolper, and V.~N. Venkatakrishnan, ``SLEUTH: Real-time attack scenario reconstruction from COTS audit data,'' in \emph{Proc. USENIX Security Symp.}, pp.~487--504, Aug. 2017.
+
+\bibitem{milajerdi2019holmes}
+S.~M. Milajerdi, R.~Gjomemo, B.~Eshete, R.~Sekar, and V.~N. Venkatakrishnan, ``HOLMES: Real-time APT detection through correlation of suspicious information flows,'' in \emph{Proc. IEEE Symp. Security and Privacy (S\&P)}, pp.~1137--1152, May 2019.
+
+\bibitem{han2020unicorn}
+X.~Han, T.~Pasquier, A.~Bates, J.~Mickens, and M.~Seltzer, ``UNICORN: Runtime provenance-based detector for advanced persistent threats,'' in \emph{Proc. NDSS}, Feb. 2020.
+
+\bibitem{smalley2001implementing}
+S.~Smalley, C.~Vance, and W.~Salamon, ``Implementing SELinux as a Linux Security Module,'' NAI Labs Report \#01-043, Dec. 2001.
+
+\bibitem{bauer2006paranoid}
+M.~Bauer, ``Paranoid penguin: An introduction to Novell AppArmor,'' \emph{Linux Journal}, vol.~2006, no.~148, p.~13, Aug. 2006.
+
+\bibitem{corbet2012seccomp}
+J.~Corbet, ``Seccomp filter (Mode 2 BPF syscall filtering),'' Linux Kernel Documentation (\texttt{Documentation/userspace-api/seccomp\_filter.rst}), 2012.
+
+\bibitem{wang2005strider}
+Y.-M. Wang, D.~Beck, B.~Vo, R.~Roussev, and C.~Verbowski, ``Detecting stealth software with Strider GhostBuster,'' in \emph{Proc. IEEE/IFIP Int. Conf. Dependable Systems and Networks (DSN)}, pp.~368--377, Jun. 2005.
+
+\bibitem{garfinkel2003virtual}
+T.~Garfinkel and M.~Rosenblum, ``A virtual machine introspection based architecture for intrusion detection,'' in \emph{Proc. NDSS}, pp.~191--206, Feb. 2003.
+
+\bibitem{jung2004fast}
+J.~Jung, V.~Paxson, A.~W. Berger, and H.~Balakrishnan, ``Fast portscan detection using sequential hypothesis testing,'' in \emph{Proc. IEEE Symp. Security and Privacy (S\&P)}, pp.~211--225, May 2004.
+
+\bibitem{greshake2023not}
+K.~Greshake, S.~Abdelnabi, S.~Mishra, C.~Endres, T.~Holz, and M.~Fritz, ``Not what you've signed up for: Compromising real-world LLM-integrated applications with indirect prompt injection,'' in \emph{Proc. ACM AISec Workshop}, pp.~79--90, Nov. 2023.
+
+\bibitem{mitre2024attack}
+MITRE Corporation, ``MITRE ATT\&CK Enterprise Matrix (T1204.004 User Execution: Malicious Copy and Paste),'' Technical Knowledge Base, 2024--2026.
+
+\bibitem{wilson1927probable}
+E.~B. Wilson, ``Probable inference, the law of succession, and statistical inference,'' \emph{Journal of the American Statistical Association}, vol.~22, no.~158, pp.~209--212, Jun. 1927.
+
+\bibitem{mcnemar1947note}
+Q.~McNemar, ``Note on the sampling error of the difference between correlated proportions or percentages,'' \emph{Psychometrika}, vol.~12, no.~2, pp.~153--157, Jun. 1947.
+
+\end{thebibliography}
+
+% ============================================================================
+% APPENDICES: COMPLETE MATHEMATICAL PROOFS
+% ============================================================================
+\clearpage
+\appendix
+
+\section{Proofs of Provenance Decay and Noisy-OR Fusion}
+\label{app:decay}
+
+\begin{proposition}[Monotonicity and Invariance of Label Decay]
+\label{prop:decay}
+Let $s_\ell(t) = s_0 \cdot 2^{-(t - t_0)/T_{1/2}}$ for $s_0 \in [0, 1]$, $T_{1/2} > 0$, and $t \ge t_0$. Then:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+  \item $s_\ell(t) \in [0, s_0] \subseteq [0, 1]$ for all $t \ge t_0$;
+  \item $s_\ell(t)$ is strictly decreasing in $t$ whenever $s_0 > 0$, with $s_\ell(t_0 + k T_{1/2}) = 2^{-k} s_0$;
+  \item Under edge attenuation $a_e \in (0, 1]$, any $d$-hop causal path $p = (e_1, \dots, e_d)$ satisfies $s_{\text{leaf}}(t) = s_0 \big(\prod_{r=1}^{d} a_{e_r}\big) 2^{-\Delta t / T_{1/2}} \le s_\ell(t)$.
+\end{enumerate}
+\end{proposition}
+\begin{proof}
+Since $T_{1/2} > 0$ and $\Delta t = t - t_0 \ge 0$, we have $-\Delta t / T_{1/2} \le 0$, so $0 < 2^{-\Delta t / T_{1/2}} \le 1$, proving $0 \le s_\ell(t) \le s_0 \le 1$. Differentiating with respect to $t$ yields
+\[
+  \frac{\mathrm{d}s_\ell(t)}{\mathrm{d}t} = -\frac{\ln 2}{T_{1/2}}\, s_0 \, 2^{-(t - t_0)/T_{1/2}} < 0 \quad (\forall s_0 > 0),
+\]
+establishing strict temporal monotonicity, and direct substitution of $\Delta t = k T_{1/2}$ gives $s_\ell(t_0 + k T_{1/2}) = 2^{-k}s_0$. Finally, because $a_{e_r} \in (0, 1]$ for every edge $e_r$, induction over path length $d$ yields $0 < \prod_{r=1}^{d} a_{e_r} \le 1$, whence $s_{\text{leaf}}(t) \le s_\ell(t)$.
+\end{proof}
+
+\begin{theorem}[Algebraic and Dominance Properties of Noisy-OR]
+\label{thm:noisyor}
+For any finite multiset of label strengths $\mathbf{s} = (s_1, \dots, s_m) \in [0, 1]^m$, define $\operatorname{NOR}(\mathbf{s}) = 1 - \prod_{i=1}^{m}(1 - s_i)$ (with empty product $1$). Then:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+  \item \textbf{Range closure:} $\operatorname{NOR}(\mathbf{s}) \in [0, 1]$;
+  \item \textbf{Dominance:} $\max_{1 \le i \le m} s_i \le \operatorname{NOR}(\mathbf{s}) \le \min\!\big(1, \sum_{i=1}^{m} s_i\big)$;
+  \item \textbf{Commutative monoid:} $\operatorname{NOR}$ is symmetric, associative under binary composition $x \oplus y = 1 - (1-x)(1-y) = x + y - xy$, has identity element $0$, and absorbing element $1$;
+  \item \textbf{Coordinate-wise monotonicity:} If $s_i \le s'_i$ for all $i$, then $\operatorname{NOR}(\mathbf{s}) \le \operatorname{NOR}(\mathbf{s}')$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(1) Since $s_i \in [0, 1]$, each factor satisfies $1 - s_i \in [0, 1]$, so $P = \prod_{i=1}^{m}(1 - s_i) \in [0, 1]$ and $1 - P \in [0, 1]$.
+
+(2) Fix an arbitrary index $k \in \{1, \dots, m\}$. Because $\prod_{i \neq k}(1 - s_i) \le 1$ and $1 - s_k \ge 0$, we obtain
+\[
+  \prod_{i=1}^{m}(1 - s_i) = (1 - s_k)\prod_{i \neq k}(1 - s_i) \le 1 - s_k
+  \implies \operatorname{NOR}(\mathbf{s}) \ge s_k.
+\]
+Taking the maximum over $k$ yields $\operatorname{NOR}(\mathbf{s}) \ge \max_i s_i$. For the upper bound, induction on $m$ using Weierstrass's inequality $\prod_{i=1}^{m}(1 - s_i) \ge 1 - \sum_{i=1}^{m} s_i$ gives $\operatorname{NOR}(\mathbf{s}) \le \sum_{i=1}^{m} s_i$, and combining with (1) gives $\min(1, \sum_i s_i)$.
+
+(3) Symmetry follows from commutativity of real multiplication. For associativity, $(x \oplus y) \oplus z = 1 - (1 - [1 - (1-x)(1-y)])(1-z) = 1 - (1-x)(1-y)(1-z) = x \oplus (y \oplus z)$. Moreover, $x \oplus 0 = 1 - (1-x)\cdot 1 = x$ and $x \oplus 1 = 1 - (1-x)\cdot 0 = 1$.
+
+(4) If $s_i \le s'_i$, then $0 \le 1 - s'_i \le 1 - s_i$ for each $i$, so $\prod_{i=1}^{m}(1 - s'_i) \le \prod_{i=1}^{m}(1 - s_i)$, whence $\operatorname{NOR}(\mathbf{s}) \le \operatorname{NOR}(\mathbf{s}')$.
+\end{proof}
+
+% ============================================================================
+\section{Derivation of Bayes-Optimal Thresholds and Contract Gate}
+\label{app:bayes}
+
+\begin{theorem}[Bayes Minimal-Risk Log-Odds Thresholds]
+\label{thm:bayes_thresholds}
+Let $Y \in \{0, 1\}$ denote whether a story $S$ is benign ($Y=0$) or an attack ($Y=1$), and let $p = \mathbb{P}(Y = 1 \mid S) = (1 + e^{-L})^{-1}$ be the posterior attack probability corresponding to log-odds $L = \ln\frac{p}{1-p}$. Suppose:
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+  \item Action $a_{\text{allow}}$ incurs loss $C_{\text{miss}} > 0$ if $Y=1$ and $0$ if $Y=0$;
+  \item Action $a_{\text{block}}$ incurs loss $0$ if $Y=1$ and $C_{\text{fb}} > 0$ if $Y=0$;
+  \item Action $a_{\text{hold}}$ incurs human-review cost $C_{\text{hold}} > 0$ if $Y=0$, and catches a true attack ($Y=1$) with probability $h \in (0, 1]$ (leaving residual miss cost $(1 - h)C_{\text{miss}}$; when $C_{\text{hold}} \ll C_{\text{miss}}$ we neglect the $O(C_{\text{hold}})$ operational overhead under $Y=1$).
+\end{itemize}
+Then:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1.5pt,topsep=2pt]
+  \item Pairwise preference $R(a_{\text{block}} \mid S) \le R(a_{\text{allow}} \mid S)$ holds iff
+  \[
+    L \ge \tau_{\text{block}} \triangleq \ln\frac{C_{\text{fb}}}{C_{\text{miss}}};
+  \]
+  \item Pairwise preference $R(a_{\text{hold}} \mid S) \le R(a_{\text{allow}} \mid S)$ holds iff
+  \[
+    L \ge \tau_{\text{hold}} \triangleq \ln\frac{C_{\text{hold}}}{h \cdot C_{\text{miss}}};
+  \]
+  \item A non-empty \texttt{HOLD} interval $[\tau_{\text{hold}}, \tau_{\text{block}})$ exists iff $C_{\text{hold}} < h \cdot C_{\text{fb}}$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+The conditional Bayes risks of the three actions given posterior $p \in (0, 1)$ are:
+\begin{align*}
+  R(a_{\text{allow}} \mid S) &= p \, C_{\text{miss}},\\
+  R(a_{\text{block}} \mid S) &= (1 - p) \, C_{\text{fb}},\\
+  R(a_{\text{hold}} \mid S)  &= p (1 - h) C_{\text{miss}} + (1 - p) C_{\text{hold}}.
+\end{align*}
+For (1), $R(a_{\text{block}} \mid S) \le R(a_{\text{allow}} \mid S)$ iff $(1 - p) C_{\text{fb}} \le p \, C_{\text{miss}}$, which rearranges to
+\[
+  \frac{p}{1 - p} \ge \frac{C_{\text{fb}}}{C_{\text{miss}}}
+  \iff L = \ln\frac{p}{1 - p} \ge \ln\frac{C_{\text{fb}}}{C_{\text{miss}}} = \tau_{\text{block}}.
+\]
+For (2), $R(a_{\text{hold}} \mid S) \le R(a_{\text{allow}} \mid S)$ iff
+\[
+  p(1 - h)C_{\text{miss}} + (1 - p)C_{\text{hold}} \le p \, C_{\text{miss}}
+  \iff (1 - p)C_{\text{hold}} \le p \, h \, C_{\text{miss}}.
+\]
+Dividing by $(1 - p) h C_{\text{miss}} > 0$ and taking natural logarithms yields
+\[
+  \frac{p}{1 - p} \ge \frac{C_{\text{hold}}}{h \cdot C_{\text{miss}}}
+  \iff L \ge \ln\frac{C_{\text{hold}}}{h \cdot C_{\text{miss}}} = \tau_{\text{hold}}.
+\]
+For (3), by strict monotonicity of $\ln(\cdot)$, $\tau_{\text{hold}} < \tau_{\text{block}} \iff \frac{C_{\text{hold}}}{h C_{\text{miss}}} < \frac{C_{\text{fb}}}{C_{\text{miss}}} \iff C_{\text{hold}} < h \, C_{\text{fb}}$. Substituting Refmon's default policy costs ($C_{\text{hold}} = 5$, $h = 0.7$, $C_{\text{fb}} = 20$) gives $5 < 14$, yielding $\tau_{\text{hold}} = \ln(5/700) = -4.9416 < \tau_{\text{block}} = \ln(20/1000) = -3.9120$.
+\end{proof}
+
+\begin{corollary}[Sensitivity Directionality]
+$\partial \tau_{\text{block}} / \partial C_{\text{fb}} = 1/C_{\text{fb}} > 0$, $\partial \tau_{\text{block}} / \partial C_{\text{miss}} = -1/C_{\text{miss}} < 0$, and $\partial \tau_{\text{hold}} / \partial h = -1/h < 0$. Thus raising false-block penalties raises the evidence bar for blocking, whereas raising missed-attack cost lowers both thresholds monotonically.
+\end{corollary}
+
+% ============================================================================
+\section{Proof of Posterior Monotonicity in \texttt{v1.3} (Resolution of F8)}
+\label{app:monotone}
+
+\begin{theorem}[Monotonicity of \texttt{v1.3} Calculus vs.\ Non-Monotonicity of \texttt{v1.2}]
+\label{thm:monotone}
+Fix a story $S$ with non-empty Contract or Effect signals having positive max weights $W_C = \max_{j \in \mathcal{S}_C} w_j > 0$ and $W_E = \max_{k \in \mathcal{S}_E} w_k \ge 0$, origin weight $w_{\text{ori}} \ge 0$, and origin threshold $\theta \in (0, 1)$.
+\begin{enumerate}[leftmargin=1.5em,itemsep=1.5pt,topsep=2pt]
+  \item Under the legacy \texttt{v1.2} rule $L_{\text{v1.2}}(s) = L_0 + w_{\text{ori}} s \mathbf{1}[s \ge \theta] + \big(s \mathbf{1}[s \ge \theta] + \mathbf{1}[s < \theta]\big)(W_C + W_E)$, $L_{\text{v1.2}}(s)$ is \textbf{not} non-decreasing on $[0, 1]$ whenever $W_C + W_E > \frac{\theta}{1 - \theta} w_{\text{ori}}$.
+  \item Under the \texttt{v1.3} rule $L_{\text{v1.3}}(s) = L_0 + w_{\text{ori}} s \mathbf{1}[s \ge \theta] + W_C + W_E$, $L_{\text{v1.3}}(s)$ is monotonically non-decreasing over all $s \in [0, 1]$ and under arbitrary signal additions with $w_j \ge 0$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(1) Evaluate the left and right limits of $L_{\text{v1.2}}(s)$ at $s = \theta$:
+\begin{align*}
+  \lim_{s \uparrow \theta} L_{\text{v1.2}}(s) &= L_0 + W_C + W_E,\\
+  L_{\text{v1.2}}(\theta) &= L_0 + \theta w_{\text{ori}} + \theta(W_C + W_E).
+\end{align*}
+Hence $L_{\text{v1.2}}(\theta) - \lim_{s \uparrow \theta} L_{\text{v1.2}}(s) = \theta w_{\text{ori}} - (1 - \theta)(W_C + W_E)$. For Refmon's defaults ($\theta = 0.5$, $w_{\text{ori}} = 0.8$), whenever $W_C + W_E > 0.8$ (which holds for \emph{every} Contract + Effect pair in Table~\ref{tab:weights}, e.g., $W_C + W_E = 1.0 + 2.5 = 3.5$), we have $L_{\text{v1.2}}(0.5) - L_{\text{v1.2}}(0.499) = 0.4 - 1.75 = -1.35 < 0$, proving a downward jump where stronger provenance produced weaker evidence.
+
+(2) In \texttt{v1.3}, write $g(s) = w_{\text{ori}} s \mathbf{1}[s \ge \theta]$. For $0 \le s_1 \le s_2 < \theta$, $g(s_1) = g(s_2) = 0$. For $0 \le s_1 < \theta \le s_2 \le 1$, since $w_{\text{ori}} \ge 0$ and $s_2 \ge \theta > 0$, $g(s_1) = 0 \le w_{\text{ori}} s_2 = g(s_2)$. For $\theta \le s_1 \le s_2 \le 1$, $g(s_2) - g(s_1) = w_{\text{ori}}(s_2 - s_1) \ge 0$. Since $W_C$ and $W_E$ are independent of $s$ (apart from D23's indicator $\mathbf{1}[s \ge \theta]$ which only \emph{adds} positive allowed-effect weights when $s$ crosses $\theta$), $L_{\text{v1.3}}(s_1) \le L_{\text{v1.3}}(s_2)$ for all $0 \le s_1 \le s_2 \le 1$. Furthermore, adding any signal $j^*$ with $w_{j^*} \ge 0$ to question set $\mathcal{S}_q$ satisfies $\max_{j \in \mathcal{S}_q \cup \{j^*\}} w_j s_j \ge \max_{j \in \mathcal{S}_q} w_j s_j$, so $L_{\text{v1.3}}$ never decreases when evidence is added.
+\end{proof}
+
+% ============================================================================
+\section{Proofs of Laplace Surprisal and Good-Turing Unseen Mass}
+\label{app:rarity}
+
+\begin{proposition}[Properness and Surprisal Bounds of Laplace Role Model]
+Let $n_1, \dots, n_K \ge 1$ be observed counts summing to $N = \sum_{e=1}^{K} n_e$, and define $\hat{p}(e) = \frac{n_e + \alpha}{N + \alpha(K + 1)}$ for $e \in \{1, \dots, K\}$ and $\hat{p}(\text{unseen}) = \frac{\alpha}{N + \alpha(K + 1)}$ with $\alpha > 0$. Then $\hat{p}$ is a valid probability distribution on $\{1, \dots, K, \text{unseen}\}$, and unseen-event surprisal satisfies $I(\text{unseen}) = \log_2\!\big(\frac{N}{\alpha} + K + 1\big)$.
+\end{proposition}
+\begin{proof}
+Every probability is strictly positive since $n_e \ge 0$ and $\alpha > 0$. Summing over all $K + 1$ outcomes gives
+\[
+  \sum_{e=1}^{K} \frac{n_e + \alpha}{N + \alpha(K + 1)} + \frac{\alpha}{N + \alpha(K + 1)}
+  = \frac{\sum_{e=1}^{K} n_e + K\alpha + \alpha}{N + \alpha(K + 1)} = \frac{N + \alpha(K + 1)}{N + \alpha(K + 1)} = 1.
+\]
+Taking $-\log_2 \hat{p}(\text{unseen})$ yields $\log_2((N + \alpha(K+1))/\alpha) = \log_2(N/\alpha + K + 1)$. In particular, for $\alpha = 1$, $I(\text{unseen}) \ge 12$~bits requires $N + K + 1 \ge 2^{12} = 4096$, automatically preventing surprisal false alarms on small samples even before the Good-Turing check.
+\end{proof}
+
+\begin{theorem}[Unbiasedness of Good-Turing Unseen Probability Estimator~\cite{good1953population}]
+\label{thm:goodturing}
+Suppose $N$ i.i.d.\ events are drawn from an unknown discrete distribution $\{p_e\}_{e \in \mathcal{U}}$ over a countable alphabet $\mathcal{U}$. Let $N_e$ be the count of kind $e$ in the first $N$ draws, $U_N = \sum_{e \in \mathcal{U}} p_e \mathbf{1}[N_e = 0]$ be the true random probability mass of kinds unseen in $N$ draws, and $N_1^{(N+1)} = \sum_{e \in \mathcal{U}} \mathbf{1}[N'_e = 1]$ be the number of singletons in a sample of size $N + 1$. Then:
+\[
+  \mathbb{E}[U_N] = \frac{\mathbb{E}\big[N_1^{(N+1)}\big]}{N + 1} \approx \frac{\mathbb{E}[N_1^{(N)}]}{N}.
+\]
+\end{theorem}
+\begin{proof}
+By linearity of expectation and $N_e \sim \operatorname{Binomial}(N, p_e)$,
+\[
+  \mathbb{E}[U_N] = \sum_{e \in \mathcal{U}} p_e \mathbb{P}(N_e = 0) = \sum_{e \in \mathcal{U}} p_e (1 - p_e)^N.
+\]
+Conversely, in $N + 1$ i.i.d.\ draws, $\mathbb{P}(N'_e = 1) = (N + 1) p_e (1 - p_e)^N$. Summing over $e \in \mathcal{U}$ and dividing by $N + 1$ gives
+\[
+  \frac{\mathbb{E}\big[N_1^{(N+1)}\big]}{N + 1} = \frac{1}{N + 1}\sum_{e \in \mathcal{U}} (N + 1) p_e (1 - p_e)^N = \sum_{e \in \mathcal{U}} p_e (1 - p_e)^N = \mathbb{E}[U_N].
+\]
+For $N \gg 1$, replacing $N+1$ by $N$ yields $\hat{p}_{\text{unseen}} = N_1 / N$ with $O(1/N)$ bias.
+\end{proof}
+
+% ============================================================================
+\section{Proofs of Statistical Rate and CUSUM Drift Properties}
+\label{app:stats}
+
+\begin{proposition}[Numerical Exactness of Upper-Tail Poisson Recurrence]
+For $X \sim \operatorname{Poisson}(\lambda)$ with $\lambda > 0$ and integer $k \ge 1$, the upper tail $T(k, \lambda) = \sum_{i=k}^{\infty} t_i$ with $t_k = \exp(-\lambda + k \ln \lambda - \ln \Gamma(k + 1))$ and recurrence $t_{i+1} = t_i \cdot \frac{\lambda}{i + 1}$ converges strictly monotonically for $i \ge \lceil \lambda \rceil$ with relative truncation error below machine epsilon $\varepsilon_{\text{mach}}$ once $t_i \le \varepsilon_{\text{mach}} \sum_{j=k}^{i} t_j$.
+\end{proposition}
+\begin{proof}
+Computing $\ln t_k$ via $\operatorname{lgamma}(k + 1) = \ln(k!)$ avoids catastrophic cancellation in $1 - \sum_{i=0}^{k-1} t_i$ when $T(k, \lambda) \approx 10^{-12} \ll \varepsilon_{\text{mach}} \approx 2.22 \times 10^{-16}$ (where complement subtraction returns $0.0$). For all $i \ge \max(k, \lceil 2\lambda \rceil)$, $t_{i+1}/t_i = \lambda/(i+1) \le 1/2$, so the omitted tail satisfies $\sum_{j=i+1}^{\infty} t_j \le t_{i+1} \sum_{r=0}^{\infty} 2^{-r} = 2 t_{i+1} \le t_i$, bounding relative error by $\varepsilon_{\text{mach}}$.
+\end{proof}
+
+\begin{proposition}[Negative Drift Under Benign Null and Poisoning Immunity]
+Let $z_t = (x_t - \mu)/\sigma$ have $\mathbb{E}_0[z_t] = 0$ under benign traffic and $\mathbb{E}_1[z_t] = \delta > k_c > 0$ under slow exfiltration. Then the one-sided CUSUM $S_t = \max(0, S_{t-1} + z_t - k_c)$ has strictly negative pre-reflection increment drift $\mathbb{E}_0[z_t - k_c] = -k_c < 0$ under $\mathcal{H}_0$ (preventing unbounded random-walk drift) and strictly positive drift $\mathbb{E}_1[z_t - k_c] = \delta - k_c > 0$ under $\mathcal{H}_1$, matching the Gaussian log-likelihood ratio test for shift $\delta = 2 k_c$~\cite{page1954continuous,lorden1971procedures}. Moreover, when EMA updates $\hat{\lambda}_t = (1 - \beta)\hat{\lambda}_{t-1} + \beta y_t \cdot \mathbf{1}[\neg\text{incident}]$ are gated on $J.\text{decision} = \texttt{ALLOW}$, any sequence of anomalous bursts during an open incident leaves $\hat{\lambda}_t \equiv \hat{\lambda}_{t_{\text{open}}}$, preventing baseline inflation.
+\end{proposition}
+\begin{proof}
+Under Gaussian $z_t \sim \mathcal{N}(\delta, 1)$ vs.\ $\mathcal{N}(0, 1)$, the single-step log-likelihood ratio is $\ln \frac{\phi(z_t - \delta)}{\phi(z_t)} = \delta z_t - \frac{\delta^2}{2} = \delta\big(z_t - \frac{\delta}{2}\big)$. Setting $k_c = \delta/2 > 0$ scales Page's SPRT recursion directly into Eq.~\eqref{eq:cusum}. Under $\mathcal{H}_0$, $\mathbb{E}_0[z_t - k_c] = -k_c < 0$; under $\mathcal{H}_1$ with $\delta > k_c$, $\mathbb{E}_1[z_t - k_c] = \delta - k_c > 0$. Finally, during $[t_{\text{open}}, t_{\text{close}}]$, $\mathbf{1}[\neg\text{incident}] = 0 \implies \hat{\lambda}_t = \hat{\lambda}_{t_{\text{open}}}$ by trivial induction.
+\end{proof}
+
+% ============================================================================
+\section{Proofs of Differential Privacy and Zero-FP Bloom Filtering}
+\label{app:privacy}
+
+\begin{theorem}[$\varepsilon$-Differential Privacy of Aggregate Fleet Counts]
+Let $D, D'$ be neighboring device-telemetry datasets differing in the state of at most one device, and let $f(D) \in \mathbb{N}$ count the number of devices experiencing a given rule or tactic ($\Delta f = \max_{D \sim D'} |f(D) - f(D')| = 1$). Then the mechanism $\mathcal{M}(D) = f(D) + \eta$ where $\eta$ is sampled via inverse transform $F^{-1}(u) = -\frac{1}{\varepsilon}\operatorname{sgn}(u - \tfrac{1}{2})\ln\big(1 - 2|u - \tfrac{1}{2}|\big)$ for $u \sim \operatorname{Uniform}(0, 1)$ satisfies pure $\varepsilon$-differential privacy.
+\end{theorem}
+\begin{proof}
+First, for $y \ge 0$, $\mathbb{P}(F^{-1}(u) \ge y) = \mathbb{P}\big(u - \tfrac{1}{2} \ge \tfrac{1}{2}(1 - e^{-\varepsilon y})\big) = \frac{1}{2}e^{-\varepsilon y}$; by symmetry around $0$, $\eta$ has density $p_\eta(z) = \frac{\varepsilon}{2}\exp(-\varepsilon |z|)$, i.e., $\eta \sim \operatorname{Lap}(0, 1/\varepsilon)$. Second, for any measurable output $z \in \mathbb{R}$ and neighboring $D, D'$ with $|f(D) - f(D')| \le \Delta f = 1$, the reverse triangle inequality $|z - f(D')| - |z - f(D)| \le |f(D) - f(D')| \le 1$ gives:
+\[
+  \frac{p_{\mathcal{M}(D)}(z)}{p_{\mathcal{M}(D')}(z)}
+  = \frac{\frac{\varepsilon}{2}\exp(-\varepsilon |z - f(D)|)}{\frac{\varepsilon}{2}\exp(-\varepsilon |z - f(D')|)}
+  = \exp\!\Big(\varepsilon\big(|z - f(D')| - |z - f(D)|\big)\Big) \le e^{\varepsilon}. \qedhere
+\]
+\end{proof}
+
+\begin{theorem}[Optimal Sizing and Zero Operational False Positives of Confirmed Bloom Threat Lists]
+\label{thm:bloom}
+For $n$ threat entries inserted into an $m$-bit array using $k_h$ independent hash positions, the asymptotic filter false-positive probability $p(k_h) = \big(1 - e^{-k_h n / m}\big)^{k_h}$ is minimized at $k_h^* = \frac{m}{n}\ln 2$, requiring $m = \lceil -n \ln p_{\text{fp}} / (\ln 2)^2 \rceil$ bits for target hint rate $p_{\text{fp}}$. Moreover, two-stage confirmation $H(x) = \mathbf{1}[\mathcal{B}(x) = 1 \land d(x) \in \mathcal{D}_{\text{exact}}]$ achieves zero false negatives relative to $\mathcal{D}_{\text{exact}}$ and false-positive probability $\le 2^{-256}$ (HMAC-SHA256 collision bound).
+\end{theorem}
+\begin{proof}
+Let $g(k_h) = \ln p(k_h) = k_h \ln(1 - e^{-k_h n / m})$. Setting $x = e^{-k_h n / m} \in (0, 1)$ gives $k_h = -\frac{m}{n}\ln x$ and $g = -\frac{m}{n}\ln x \ln(1 - x)$. Differentiating with respect to $x$:
+\[
+  \frac{\mathrm{d}g}{\mathrm{d}x} = -\frac{m}{n}\!\left(\frac{\ln(1 - x)}{x} - \frac{\ln x}{1 - x}\right) = 0 \iff x = 1 - x \iff x = \frac{1}{2}.
+\]
+Substituting $x = 1/2$ yields $k_h^* = \frac{m}{n}\ln 2$ and $p(k_h^*) = (1/2)^{(m/n)\ln 2} = e^{-m(\ln 2)^2 / n} \le p_{\text{fp}} \iff m \ge -n \ln p_{\text{fp}} / (\ln 2)^2$. Finally, because a Bloom filter has zero false negatives ($d(x) \in \mathcal{D}_{\text{exact}} \implies \mathcal{B}(x) = 1$), $H(x) = 1 \iff d(x) \in \mathcal{D}_{\text{exact}}$; for $x \notin \mathcal{D}_{\text{bad}}$, $d(x) \in \mathcal{D}_{\text{exact}}$ occurs only on an HMAC-SHA256 collision across $n$ entries ($\le n \cdot 2^{-256}$ under PRF security~\cite{bellare1996keying}).
+\end{proof}
+
+% ============================================================================
+\section{Proof of Multi-Pass Rootkit Churn Suppression}
+\label{app:rootkit}
+
+\begin{proposition}[Exponential Suppression of Transient OS Race Discrepancies]
+\label{prop:rootkit_churn}
+Suppose during pass $r \in \{1, \dots, m\}$ separated by $\Delta\tau$ exceeding typical syscall directory-walk latency, a benign short-lived entity $x$ (such as an exiting worker PID or unloading kernel module) produces a transient cross-view race $x \in \mathcal{V}_{\text{low}}^{(r)} \setminus \mathcal{V}_{\text{high}}^{(r)}$ with probability $p_{\text{race}} \ll 1$ on Pass~1 and conditional persistence probability $q_{\text{persist}} \ll 1$ on each subsequent pass, whereas a stealth rootkit actively hiding $x^*$ satisfies $x^* \in \mathcal{V}_{\text{low}}^{(r)} \setminus \mathcal{V}_{\text{high}}^{(r)}$ with probability $p_{\text{tp}} \approx 1$ on every pass. Then for $\Delta_{\text{pers}} = \bigcap_{r=1}^{m}(\mathcal{V}_{\text{low}}^{(r)} \setminus \mathcal{V}_{\text{high}}^{(r)})$:
+\[
+  \mathbb{P}(x \in \Delta_{\text{pers}} \mid \text{benign}) = p_{\text{race}} \cdot q_{\text{persist}}^{\,m - 1}, \qquad
+  \ln\frac{\mathbb{P}(x \in \Delta_{\text{pers}} \mid \text{rootkit})}{\mathbb{P}(x \in \Delta_{\text{pers}} \mid \text{benign})}
+  = \ln\frac{p_{\text{tp}}}{p_{\text{race}}} + (m - 1)\ln\frac{1}{q_{\text{persist}}}.
+\]
+\end{proposition}
+\begin{proof}
+By the chain rule of conditional probability across passes $1, \dots, m$,
+\[
+  \mathbb{P}\!\left(\bigcap_{r=1}^{m} E_r \;\middle|\; \text{benign}\right)
+  = \mathbb{P}(E_1 \mid \text{benign}) \prod_{r=2}^{m} \mathbb{P}(E_r \mid E_1, \dots, E_{r-1}, \text{benign})
+  = p_{\text{race}} \, q_{\text{persist}}^{\,m - 1}.
+\]
+Under a persistent rootkit hook (e.g., an LKM unlinked from \texttt{modules} list but still mounted in \texttt{/sys/module}, or \texttt{getdents64} filtering PID $x^*$), $E_r$ holds deterministically across passes ($\mathbb{P}(\bigcap_{r=1}^{m} E_r \mid \text{rootkit}) = p_{\text{tp}}$). Taking the natural log-likelihood ratio yields $\ln(p_{\text{tp}} / p_{\text{race}}) + (m - 1)\ln(1 / q_{\text{persist}})$, and applying the policy cap $w_{\max}$ yields Eq.~\eqref{eq:rk_nats}. For $p_{\text{race}} = 0.02$, $q_{\text{persist}} = 0.05$, and $m = 2$, benign race probability drops from $2 \times 10^{-2}$ to $10^{-3}$ ($20\times$ reduction) in a single $50$~ms interval.
+\end{proof}
+
+\end{document}

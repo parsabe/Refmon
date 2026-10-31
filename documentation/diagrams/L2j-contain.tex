@@ -1,0 +1,43 @@
+% Level 2j: Contain.plan(story, kind, effects, producers) (src/refmon/contain.py). Wide figure.
+\begin{tikzpicture}[rm]
+  \node[rm io, minimum width=44mm] (in) at (0,0) {story, \emph{kind} $\in$ \{block, hold\_endpoint, hold\_server\},\\\tiny Effects, signal producers};
+  \node[rm box] (m) at (0,-1.35) {members = story processes that carried a \emph{live} label};
+  \node[rm dec] (d) at (0,-2.75) {no member and\\(hold, or no origin\\label in the story)?};
+  \node[rm sub] (fb) at (4.9,-2.75) {fallback (A47, A51, A52):\\\tiny members = processes that produced the signals\\\tiny or raised the override, \emph{never} browser, mail,\\\tiny launcher (they only started the command)};
+  \node[rm box] (r) at (0,-4.2) {roots = members whose parent is not a member};
+  \node[rm dec] (k) at (0,-5.5) {kind?};
+  \node[rm block, align=left, font=\scriptsize\sffamily, minimum width=42mm] (b) at (-4.6,-7.35)
+    {\textbf{block}\\[1pt]
+     \tiny $\bullet$ kill the process tree of each root\\
+     \tiny $\bullet$ cut the network of members that connected\\
+     \tiny $\bullet$ quarantine their new files (move, mode 0400)\\
+     \tiny $\bullet$ restore changed files (known-good hash)\\
+     \tiny $\bullet$ revert persistence items they wrote\\
+     \tiny $\bullet$ isolate the host if the story has \texttt{lateral}};
+  \node[rm hold, align=left, font=\scriptsize\sffamily, minimum width=36mm] (hs) at (0,-7.35)
+    {\textbf{hold, server}\\[1pt]
+     \tiny $\bullet$ pause each root\\
+     \tiny $\bullet$ quarantine new files of members};
+  \node[rm hold, align=left, font=\scriptsize\sffamily, minimum width=30mm] (he) at (4.2,-7.35)
+    {\textbf{hold, endpoint}\\[1pt]
+     \tiny $\bullet$ pause each root};
+  \node[rm box] (dd) at (0,-9.25) {de-duplicate steps};
+  \node[rm io, minimum width=56mm] (out) at (0,-10.4) {Gate wraps each \texttt{Step} as an \texttt{Action} (with undo record) $\to$ \texttt{Enforcer.act}};
+
+  \draw[rm flow] (in) -- (m);
+  \draw[rm flow] (m) -- (d);
+  \draw[rm flow] (d) -- node[rm yes, above] {yes} (fb);
+  \draw[rm flow] (d) -- node[rm no, right] {no} (r);
+  \draw[rm flow] (fb.south) |- (r.east);
+  \draw[rm flow] (r) -- (k);
+  \draw[rm flow] (k.west) -| node[rm lbl, pos=0.25] {block} (b.north);
+  \draw[rm flow] (k) -- node[rm lbl] {hold\_server} (hs);
+  \draw[rm flow] (k.east) -| node[rm lbl, pos=0.25] {hold\_endpoint} (he.north);
+  \draw[rm flow] (b.south) |- (dd.west);
+  \draw[rm flow] (hs) -- (dd);
+  \draw[rm flow] (he.south) |- (dd.east);
+  \draw[rm flow] (dd) -- (out);
+
+  \node[rm note, anchor=north] at (0,-10.85)
+    {Nothing is ever deleted; every action has an undo record (a killed process stays killed).};
+\end{tikzpicture}

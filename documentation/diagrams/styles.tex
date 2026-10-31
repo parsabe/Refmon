@@ -1,0 +1,78 @@
+% ============================================================================
+% Refmon diagram styles: shared by every file in documentation/diagrams/.
+% Needs \usepackage{tikz} and xcolor. It is safe to \input this after
+% main.tex's own \usetikzlibrary line: loading a library twice is harmless,
+% and every style and colour here carries an `rm' prefix so nothing in
+% main.tex is redefined.
+% ============================================================================
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,%
+  shapes.symbols,calc,fit,backgrounds,decorations.pathreplacing}
+
+% ---- palette (light, print-safe) --------------------------------------------
+\definecolor{rmInk}{HTML}{24292F}
+\definecolor{rmStage}{HTML}{DDF4FF}      \definecolor{rmStageLine}{HTML}{0969DA}
+\definecolor{rmStore}{HTML}{EAEEF2}      \definecolor{rmStoreLine}{HTML}{57606A}
+\definecolor{rmDecide}{HTML}{FFF8C5}     \definecolor{rmDecideLine}{HTML}{9A6700}
+\definecolor{rmAllow}{HTML}{DAFBE1}      \definecolor{rmAllowLine}{HTML}{1A7F37}
+\definecolor{rmHold}{HTML}{FFF1E5}       \definecolor{rmHoldLine}{HTML}{BC4C00}
+\definecolor{rmBlock}{HTML}{FFEBE9}      \definecolor{rmBlockLine}{HTML}{CF222E}
+\definecolor{rmHuman}{HTML}{FBEFFF}      \definecolor{rmHumanLine}{HTML}{8250DF}
+
+% ---- signal chips used inside node text ------------------------------------
+% \rmC{contract\_x}  \rmE{effect\_x}  \rmF{flag}   (escape underscores!)
+\providecommand{\rmChip}[2]{{\setlength{\fboxsep}{0.8pt}\colorbox{#1}{\strut\texttt{#2}}}}
+\providecommand{\rmC}[1]{\rmChip{rmStage}{#1}}
+\providecommand{\rmE}[1]{\rmChip{rmHold}{#1}}
+\providecommand{\rmF}[1]{\rmChip{rmBlock}{#1}}
+% U(allowance, effect): the universal-contract helper of signals.py
+\providecommand{\rmU}[2]{U(\texttt{#1},\,\rmE{#2})}
+
+\tikzset{
+  % picture-level defaults: \begin{tikzpicture}[rm]
+  rm/.style={font=\scriptsize\sffamily, align=center, line width=0.55pt,
+             >={Latex[length=1.6mm,width=1.3mm]}},
+  % nodes
+  rm stage/.style={rectangle, rounded corners=2.5pt, draw=rmStageLine, fill=rmStage,
+             thick, minimum height=9mm, minimum width=12mm, inner sep=2pt},
+  rm box/.style={rectangle, draw=rmInk!60, fill=white, minimum height=6mm,
+             minimum width=14mm, inner sep=2.2pt},
+  rm sub/.style={rm box, draw=rmStageLine!70, fill=rmStage!40},
+  rm dec/.style={diamond, aspect=2.1, draw=rmDecideLine, fill=rmDecide, thick,
+             inner sep=0.5pt, font=\tiny\sffamily},
+  rm term/.style={rectangle, rounded corners=2.6mm, minimum height=5.4mm,
+             minimum width=14mm, draw=rmInk!60, fill=rmStore, inner sep=2pt},
+  rm store/.style={cylinder, shape border rotate=90, aspect=0.2, draw=rmStoreLine,
+             fill=rmStore, minimum height=9mm, minimum width=15mm, inner sep=1.5pt},
+  rm io/.style={trapezium, trapezium left angle=75, trapezium right angle=105,
+             trapezium stretches=true, draw=rmInk!60, fill=white,
+             minimum height=7mm, minimum width=16mm, inner sep=1.5pt},
+  rm human/.style={rectangle, rounded corners=4pt, draw=rmHumanLine, fill=rmHuman,
+             thick, minimum height=7mm, minimum width=16mm, inner sep=2pt},
+  rm raw/.style={rm box, draw=rmBlockLine, fill=rmBlock},
+  rm allow/.style={rm term, draw=rmAllowLine, fill=rmAllow, thick,
+             font=\scriptsize\sffamily\bfseries},
+  rm hold/.style={rm term, draw=rmHoldLine, fill=rmHold, thick,
+             font=\scriptsize\sffamily\bfseries},
+  rm block/.style={rm term, draw=rmBlockLine, fill=rmBlock, thick,
+             font=\scriptsize\sffamily\bfseries},
+  rm chev/.style={signal, signal to=east, signal from=west, draw=rmStageLine,
+             fill=rmStage, minimum height=9mm, minimum width=17mm, inner sep=1pt,
+             font=\tiny\sffamily},
+  % edges
+  rm flow/.style={->, draw=rmInk!85},
+  rm back/.style={->, dashed, draw=rmStageLine, thick},
+  rm ctrl/.style={->, densely dotted, draw=rmStoreLine, thick},
+  rm hflow/.style={->, draw=rmHumanLine, thick},
+  rm bad/.style={->, draw=rmBlockLine, thick},
+  % labels
+  rm yes/.style={font=\tiny\sffamily\bfseries, text=rmAllowLine, inner sep=1pt},
+  rm no/.style={font=\tiny\sffamily\bfseries, text=rmBlockLine, inner sep=1pt},
+  rm note/.style={font=\tiny\sffamily, text=rmInk!80, inner sep=1pt},
+  rm lbl/.style={font=\tiny\sffamily, fill=white, inner sep=1pt},
+  % groups (draw on the background layer with fit=...)
+  rm group/.style={draw=rmStoreLine!70, dashed, rounded corners=5pt, inner sep=2.5mm},
+  rm lane/.style={draw=none, fill=#1, rounded corners=4pt, inner sep=2.5mm},
+  rm group label/.style={font=\tiny\sffamily\bfseries, text=rmStoreLine,
+             inner sep=1.5pt, anchor=south west},
+  rm wall/.style={draw=rmBlockLine, very thick, dashed},
+}

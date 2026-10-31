@@ -1,0 +1,34 @@
+% Level 2d: Link, grouping events into stories (src/refmon/pipeline/link.py). Single column.
+\begin{tikzpicture}[rm]
+  \node[rm io, minimum width=36mm] (in) at (0,0) {\texttt{Tagged} event + its signals, flags};
+  \node[rm sub, align=left, text width=48mm] (keys) at (0,-1.45)
+    {\textbf{story keys of the event}\\[1pt]
+     \tiny \texttt{p:}actor \hfill unless a channel role (browser, mail)\\
+     \tiny \texttt{p:}parent \hfill if the parent was seen before\\
+     \tiny \texttt{f:}fingerprint \hfill unless a network endpoint\\
+     \tiny \texttt{l:}label \hfill every actor, object and new label};
+  \node[rm box] (look) at (0,-3.0) {stories that own a key \emph{and} saw an\\event within the quiet window $W_q$ (10\,min)};
+  \node[rm dec] (n) at (0,-4.3) {how many\\open stories?};
+  \node[rm sub] (o0) at (-3.0,-5.7) {open a new\\story \texttt{st-}$n$};
+  \node[rm sub] (o1) at (0,-5.7)    {append to it};
+  \node[rm sub] (o2) at (3.0,-5.7)  {merge all into the first\\\tiny events, signals, labels,\\\tiny flags, keys};
+  \node[rm box, minimum width=50mm] (upd) at (0,-7.1)
+    {update the story\\\tiny events, signals, labels, override flags and the\\
+     \tiny processes that raised them, \texttt{trusted}; re-point every key to it};
+  \node[rm io, minimum width=30mm] (out) at (0,-8.3) {\texttt{StoryRecord}};
+
+  \draw[rm flow] (in) -- (keys);
+  \draw[rm flow] (keys) -- (look);
+  \draw[rm flow] (look) -- (n);
+  \draw[rm flow] (n.west) -| node[rm lbl, pos=0.25] {0} (o0.north);
+  \draw[rm flow] (n) -- node[rm lbl] {1} (o1);
+  \draw[rm flow] (n.east) -| node[rm lbl, pos=0.25] {$\ge 2$} (o2.north);
+  \draw[rm flow] (o0.south) |- (upd.west);
+  \draw[rm flow] (o1) -- (upd);
+  \draw[rm flow] (o2.south) |- (upd.east);
+  \draw[rm flow] (upd) -- (out);
+
+  \node[rm note, align=left, anchor=north west, text width=60mm] at (-3.4,-8.85)
+    {A persistent label keeps its item recognisable after $W_q$, but a later run of the item
+     opens a \emph{new} story: it carries the old story's Contract evidence (D21), not its events.};
+\end{tikzpicture}

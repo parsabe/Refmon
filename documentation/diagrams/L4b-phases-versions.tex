@@ -1,0 +1,53 @@
+% Level 4b: build phases (CLAUDE.md Part B) and the version history v1.0-v1.4
+% (docs/progress.md, docs/variant-seeds.md, docs/design-decisions.md). Wide figure.
+% "Contained" = block + effective hold on the 633 malicious variants of seed 654514256.
+\begin{tikzpicture}[rm,
+    ms/.style={circle, draw=rmStageLine, fill=rmStage, thick, minimum size=3.2mm, inner sep=0pt},
+    lv/.style={font=\tiny\sffamily, inner sep=1pt, align=center}]
+  % ---- phases ---------------------------------------------------------------
+  \foreach \ph/\nm [count=\ix from 0] in {0/Foundations, 1/Understand, 2/{Policy,\\contracts}, 3/Act,
+                                       4/{Report,\\Tune}, 4b/{Math\\core}, 5/Exposure, 6/{Self-test,\\packs},
+                                       7/Robustness} {
+    \node[rm chev, minimum width=14.5mm] (p\ix) at (1.55*\ix,0) {\textbf{\ph}\\\nm};
+  }
+  \node[rm chev, minimum width=14.5mm, fill=rmStore, draw=rmStoreLine, densely dashed] (p9) at (1.55*9,0) {\textbf{8}\\real\\platforms};
+  \node[rm chev, minimum width=14.5mm, fill=rmStore, draw=rmStoreLine, densely dashed] (p10) at (1.55*10,0) {\textbf{9}\\pilot};
+  \node[lv, anchor=north] at (p9.south) {not run (A58):\\needs root, eBPF,\\an isolated lab VM};
+  \node[lv, anchor=north] at (p10.south) {human-led};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, rmStoreLine]
+    ($(p0.south west)+(0.1,-0.1)$) -- ($(p8.south east)+(-0.1,-0.1)$)
+    node[midway, below=4pt, lv] {done: replay-only research code, about 1\,600 tests};
+
+  % ---- versions --------------------------------------------------------------
+  \draw[thick, ->, rmInk!70] (0,-2.9) -- (16.6,-2.9);
+  \node[ms] (m0) at (0.8,-2.9) {};
+  \node[ms] (m1) at (4.8,-2.9) {};
+  \node[ms] (m2) at (8.8,-2.9) {};
+  \node[ms] (m3) at (12.8,-2.9) {};
+  \node[ms, densely dashed, fill=white] (m4) at (15.9,-2.9) {};
+
+  \node[lv, anchor=south] at ($(m0.north)+(0,0.08)$) {\textbf{v1.0}\\after Phase 7, frozen\\seed 20261029};
+  \node[lv, anchor=south] at ($(m1.north)+(0,0.08)$) {\textbf{v1.1}\\A46--A50\\seed 268805905};
+  \node[lv, anchor=south] at ($(m2.north)+(0,0.08)$) {\textbf{v1.2}\\A51--A54\\seed 892499628};
+  \node[lv, anchor=south] at ($(m3.north)+(0,0.08)$) {\textbf{v1.3}\\A55--A57\\seed 654514256};
+  \node[lv, anchor=south] at ($(m4.north)+(0,0.08)$) {\textbf{v1.4}\\A59 (in work)\\seed 711829743};
+
+  \foreach \m/\pc in {m0/86.3, m1/98.6, m2/98.6, m3/98.7} {
+    \node[lv, anchor=north, text=rmAllowLine] at ($(\m.south)+(0,-0.06)$) {\textbf{\pc\,\%}\\contained};
+  }
+
+  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (2.8,-3.05)
+    {\textbf{F1--F4}: a hold paused nothing; a trusted class excused a fetch; slow-and-low evaded the
+     windows; a pasted command was a Contract fail only for some roles};
+  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (6.8,-3.05)
+    {\textbf{F5--F7}: the fallback paused launchers; a block acted on nothing; one-factor variants
+     did not depend on the seed};
+  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (10.8,-3.05)
+    {\textbf{F8, F9}: evidence not monotone in label strength; no benign variants generated};
+  \node[lv, anchor=north, text width=22mm, text=rmHoldLine] at (14.45,-3.05)
+    {a second route to stronger evidence from a weaker label (persistence)};
+
+  \node[lv, anchor=west, align=left] at (0,-5.1)
+    {Each version changes structural rules only in answer to findings of the previous evaluation, never the weights;\\
+     the seed it is measured on is recorded \emph{before} the change, and any later change retires that seed.};
+\end{tikzpicture}

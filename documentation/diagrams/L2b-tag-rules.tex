@@ -1,0 +1,70 @@
+% Level 2b: Tag, label propagation rules 1-7 (src/refmon/pipeline/tag.py). Wide figure.
+\begin{tikzpicture}[rm]
+  \node[rm io] (in) at (0,0) {observed \texttt{Event}};
+  \node[rm dec] (dfs) at (0,-1.25) {actor seen\\first time?};
+  \node[rm sub] (new) at (4.4,-1.25) {new process record\\\tiny inherit all parent labels (rule 4)\\\tiny + \texttt{pending} labels of the spawner (rule 3)};
+  \node[rm dec] (disp) at (0,-2.75) {event\\type?};
+  \draw[rm flow] (in) -- (dfs);
+  \draw[rm flow] (dfs) -- node[rm yes, above] {yes} (new);
+  \draw[rm flow] (dfs) -- node[rm no, right] {no} (disp);
+  \draw[rm flow] (new.south) |- (disp.east);
+
+  % ---- dispatch bus ----------------------------------------------------------
+  \draw (disp.south) -- (0,-3.75);
+  \draw (-6.2,-3.75) -- (6.2,-3.75);
+
+  % column 1: content_in / request_in
+  \node[rm dec] (b1a) at (-6.2,-4.9) {trusted\\source?};
+  \node[rm box] (tno) at (-8.9,-4.9) {no label (rule 6)\\\tiny story marked trusted};
+  \node[rm dec] (b1b) at (-6.2,-6.25) {external\\source class?};
+  \node[rm sub] (b1c) at (-6.2,-7.6) {mint label $\ell$, $s_0=1$\\\tiny or reuse the live label of $f$\\\tiny (rule 1)};
+  \node[rm dec] (b1d) at (-6.2,-8.85) {carrier\\role?};
+  \node[rm sub] (b1e) at (-6.2,-10.15) {process carries $\ell$\\\tiny \texttt{request\_in}: until its\\\tiny \texttt{request\_end} (rule 2)};
+  \node[rm note, anchor=east] (cn) at (-7.45,-8.85) {browser, mail, launcher:\\channel only, never carry};
+  \draw[rm flow] (-6.2,-3.75) -- node[rm lbl] {\texttt{content\_in}, \texttt{request\_in}} (b1a);
+  \draw[rm flow] (b1a) -- node[rm yes, above] {yes} (tno);
+  \draw[rm flow] (b1a) -- node[rm no, right] {no} (b1b);
+  \draw[rm flow] (b1b.west) -| node[rm no, above, pos=0.25] {no} (tno.south);
+  \draw[rm flow] (b1b) -- node[rm yes, right] {yes} (b1c);
+  \draw[rm flow] (b1c) -- (b1d);
+  \draw[rm flow] (b1d) -- node[rm yes, right] {yes} (b1e);
+  \draw[rm flow] (b1d.west) -- node[rm no, above] {no} (cn.east);
+
+  % column 2: request_end
+  \node[rm sub] (b2) at (-3.1,-4.9) {drop the label\\of that request\\\tiny (rule 2)};
+  \draw[rm flow] (-3.1,-3.75) -- node[rm lbl] {\texttt{request\_end}} (b2);
+
+  % column 3: exec
+  \node[rm dec] (b3a) at (0,-4.9) {$f$ matches a\\live label?};
+  \node[rm sub] (b3b) at (0,-6.3) {\texttt{pending[pid]} $\gets$ labels\\\tiny handed to the next child\\\tiny process (rule 3)};
+  \draw[rm flow] (0,-3.75) -- node[rm lbl] {\texttt{exec}} (b3a);
+  \draw[rm flow] (b3a) -- node[rm yes, right] {yes} (b3b);
+
+  % column 4: file_write / persist
+  \node[rm sub] (b4a) at (3.1,-4.9) {per live actor label: derive\\$s = a_e \cdot s_{\mathrm{parent}}$ (rule 5)};
+  \node[rm dec] (b4b) at (3.1,-6.3) {\texttt{persist} or\\web root?};
+  \node[rm sub] (b4c) at (3.1,-7.65) {\texttt{persistent = true}\\\tiny no decay (rule 6)};
+  \node[rm note, anchor=west] at (4.5,-6.3) {no: derived label\\decays normally};
+  \draw[rm flow] (3.1,-3.75) -- node[rm lbl] {\texttt{file\_write}, \texttt{persist}} (b4a);
+  \draw[rm flow] (b4a) -- (b4b);
+  \draw[rm flow] (b4b) -- node[rm yes, right] {yes} (b4c);
+
+  % column 5: everything else
+  \node[rm box] (b5) at (6.2,-4.9) {no label\\change};
+  \draw[rm flow] (6.2,-3.75) -- node[rm lbl] {other} (b5);
+
+  % ---- join and output -------------------------------------------------------
+  \foreach \n in {b1e,b2,b3b,b4c,b5} \draw (\n.south) -- (\n.south |- 0,-11.2);
+  \draw (-6.2,-11.2) -- (6.2,-11.2);
+  \node[rm io, minimum width=34mm] (out) at (0,-12.1) {\texttt{Tagged}\\\tiny live actor, object and new labels};
+  \draw[rm flow] (0,-11.2) -- (out);
+
+  % ---- strength rules used by every query -----------------------------------
+  \node[rm sub, align=left, anchor=west] (fp) at (2.3,-12.25)
+    {\textbf{label strength at time $t$}\\[1pt]
+     $s(t)=s_0\,2^{-\Delta t/T_{1/2}}$, $T_{1/2}=30$\,min\\
+     \tiny frozen when persistent or carrying Contract evidence (A49)\\
+     $s_{\mathrm{comb}}=1-\prod_i\,(1-s_i)$ \tiny (noisy-OR)\\
+     \tiny alive iff $s \ge$ \texttt{label\_alive\_floor}};
+  \draw[rm ctrl] (fp.west) -- (out.east);
+\end{tikzpicture}

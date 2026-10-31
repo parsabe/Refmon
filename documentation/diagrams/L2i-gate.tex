@@ -1,0 +1,45 @@
+% Level 2i: Gate.handle, per judged story (src/refmon/gate.py). Wide figure.
+% Gate.tick (expired holds) is the hold state machine of Figure fig:tikz_hold_fsm in main.tex.
+\begin{tikzpicture}[rm]
+  \node[rm io, minimum width=34mm] (in) at (0,0) {\texttt{Judgement} + \texttt{StoryRecord}};
+  \node[rm dec] (d1) at (0,-1.4) {mode observe\\or ALLOW?};
+  \node[rm dec] (d1b) at (3.6,-1.4) {story\\blocked\\before?};
+  \node[rm box] (cont) at (7.5,-1.4) {keep blocking\\\tiny contain objects labeled since};
+  \node[rm box] (nop) at (7.5,-2.35) {nothing\\\tiny the verdict is only logged};
+  \node[rm dec] (d2) at (0,-3.1) {mode\\warn?};
+  \node[rm box] (warn) at (4.2,-3.1) {notify admin once per higher decision\\\tiny ``would be held / blocked''; nothing paused};
+  \node[rm dec] (d3) at (0,-4.6) {BLOCK, or story\\blocked before?};
+  \node[rm block, align=center, font=\scriptsize\sffamily] (blk) at (4.2,-4.6)
+    {\textbf{block}: \texttt{Contain.plan("block")}\\\tiny issue only new steps (one action per object, ever);\\\tiny notify admin};
+  \node[rm dec] (d4) at (0,-6.2) {hold\\open?};
+  \node[rm hold, align=center, font=\scriptsize\sffamily] (sh) at (4.3,-6.2)
+    {\textbf{start hold}: \texttt{Contain.plan("hold\_<platform>")}\\
+     \tiny platform from device and roles; deadline = now + timeout;\\
+     \tiny ``continue'' offered only if fewer than 3 questions failed};
+  \node[rm human] (ep) at (9.9,-5.75) {endpoint: ask the user\\\tiny stop / continue; timeout = stop};
+  \node[rm human] (sv) at (9.9,-6.75) {server: notify admin\\\tiny release / confirm; timeout = keep quarantined};
+  \node[rm dec] (d5) at (0,-7.8) {hold\\pending?};
+  \node[rm hold, align=center, font=\scriptsize\sffamily] (ext) at (4.2,-7.8)
+    {\textbf{extend hold}: cover newly labeled objects\\\tiny all 3 questions failed meanwhile $\Rightarrow$ offer ``stop'' only};
+  \node[rm term] (res) at (0,-9.1) {nothing (hold resolved)};
+
+  \draw[rm flow] (in) -- (d1);
+  \draw[rm flow] (d1) -- node[rm yes, above] {yes} (d1b);
+  \draw[rm flow] (d1b) -- node[rm yes, above] {yes} (cont);
+  \draw[rm flow] (d1b.south) |- node[rm no, left, pos=0.3] {no} (nop.west);
+  \draw[rm flow] (d1) -- node[rm no, right] {no} (d2);
+  \draw[rm flow] (d2) -- node[rm yes, above] {yes} (warn);
+  \draw[rm flow] (d2) -- node[rm no, right] {no} (d3);
+  \draw[rm flow] (d3) -- node[rm yes, above] {yes} (blk);
+  \draw[rm flow] (d3) -- node[rm no, right] {no: HOLD} (d4);
+  \draw[rm flow] (d4) -- node[rm no, above] {no} (sh);
+  \draw[rm hflow] (sh.east) -- (ep.west);
+  \draw[rm hflow] (sh.east) -- (sv.west);
+  \draw[rm flow] (d4) -- node[rm yes, right] {yes} (d5);
+  \draw[rm flow] (d5) -- node[rm yes, above] {yes} (ext);
+  \draw[rm flow] (d5) -- node[rm no, right] {no} (res);
+
+  \node[rm note, align=left, anchor=west, text width=70mm] at (2.0,-9.1)
+    {Expired holds are resolved by \texttt{Gate.tick} before every event: an endpoint hold is denied
+     (contained), a server hold stays \texttt{KEPT\_QUARANTINED} until an admin answers.};
+\end{tikzpicture}

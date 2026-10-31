@@ -80,12 +80,37 @@ class StatRates:
         self._cusum: dict[str, Cusum] = {}
         self._volume: dict[str, tuple[int, float]] = {}
         self._volume_mean: dict[str, Ema] = {}
-        self._incident: set[str] = set()
+        self._incident: dict[str, float] = {}  # process-tree root -> last time it was open
+
+    def forget(self, now: float) -> None:
+        """v1.5 (A62): windows and drift statistics of process trees silent for longer than the
+        hour-scale window hold nothing a test could still use."""
+        horizon = now - self.policy.rates.long_window
+        for key in [k for k, w in self._windows.items() if not w.items or w.items[-1][0] < horizon]:
+            del self._windows[key]
+        seconds = dict(self._scopes())
+        for key in [k for k, (b, _) in self._buckets.items()
+                    if (b + 1) * seconds[k[2]] < horizon]:  # fmt: skip
+            del self._buckets[key]
+        for root in [r for r, (b, _) in self._volume.items()
+                     if b * self.policy.rates.window < horizon]:  # fmt: skip
+            del self._volume[root]
+            self._cusum.pop(root, None)
 
     # -- incidents freeze the baselines -----------------------------------------------------------
 
-    def mark_incident(self, root: str, is_open: bool) -> None:
-        (self._incident.add if is_open else self._incident.discard)(root)
+    def mark_incident(self, root: str, is_open: bool, ts: float | None = None) -> None:
+        if is_open:
+            self._incident[root] = ts if ts is not None else self._incident.get(root, 0.0)
+        else:
+            self._incident.pop(root, None)
+        if ts is not None:
+            # v1.5 (A61): an incident whose process tree has been silent for the hour-scale window
+            # is over. Until v1.4 it stayed open until that tree produced an allowed story, which a
+            # contained tree never does, so one block froze every baseline for good.
+            horizon = ts - self.policy.rates.long_window
+            for r in [r for r, last in self._incident.items() if last < horizon]:
+                del self._incident[r]
         for ema in [*self._baselines.values(), *self._volume_mean.values()]:
             ema.frozen = bool(self._incident)
 

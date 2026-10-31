@@ -45,7 +45,7 @@ from .policy import Policy, default_policy
 from .replay import ReplaySource
 from .schemas import Action, ActionType, Decision, Event, EventType
 
-SEED = 711829743  # active seed; earlier seeds are retired, see docs/variant-seeds.md
+SEED = 616687759  # active seed; earlier seeds are retired, see docs/variant-seeds.md
 
 DIMENSIONS: dict[str, list[str]] = {
     "delivery": ["typed", "dragged", "opened", "inbound_request"],
@@ -449,6 +449,9 @@ RANK = {Decision.ALLOW: 0, Decision.HOLD: 1, Decision.BLOCK: 2}
 
 
 PAUSING = (ActionType.HOLD, ActionType.QUARANTINE_FILE)
+# v1.6 (F12): a hold that times out is denied and contained; a kill contains at least as much as a
+# pause, so it makes the hold effective too. Applied to every version in a comparison alike.
+CONTAINING = (*PAUSING, ActionType.KILL_PROCESS_TREE)
 
 
 @dataclass
@@ -470,8 +473,8 @@ class Result:
 
     @property
     def pauses(self) -> bool:
-        """The Gate paused or quarantined something (the test of an effective hold)."""
-        return any(self.actions.get(t.value, 0) for t in PAUSING)
+        """The Gate paused, quarantined or killed something (the test of an effective hold)."""
+        return any(self.actions.get(t.value, 0) for t in CONTAINING)
 
     @property
     def acts(self) -> bool:

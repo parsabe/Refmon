@@ -1,0 +1,46 @@
+% Level 2h: statistical rate tests (src/refmon/pipeline/rates.py StatRates, calculus/stats.py, C11.6).
+% Two chains: Poisson burst tests (left) and CUSUM drift (right). Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- left: bursts --------------------------------------------------------
+  \node[rm io, minimum width=40mm] (bi) at (0,0) {event of process tree \emph{root}\\\tiny item: file fp, host fp, or client};
+  \node[rm sub] (w1) at (-2.3,-1.45) {short window\\\tiny \texttt{rates.window} = 60\,s};
+  \node[rm sub] (w2) at (2.3,-1.45)  {long window\\\tiny \texttt{long\_window} = 1\,h (A49)};
+  \node[rm box] (k1) at (-2.3,-2.75) {$k$ = distinct items\\\tiny (repeats: count)};
+  \node[rm box] (k2) at (2.3,-2.75)  {$k$ = distinct items\\\tiny (repeats: count)};
+  \node[rm store, minimum width=36mm] (lam) at (0,-4.15) {baseline $\hat\lambda$ per (kind, role, window)\\\tiny EMA over tumbling buckets};
+  \node[rm dec] (pt) at (0,-5.65) {$P(X\ge k;\hat\lambda)<\alpha$\\in either window?};
+  \node[rm box, align=left] (bs) at (0,-7.15)
+    {\texttt{mass\_change}, \texttt{lateral} $\to$ U(allowance, Effect)\\
+     response repeat $\to$ U(\dots, \texttt{response\_anomaly\_repeated})};
+  \draw[rm flow] (bi) -| (w1);
+  \draw[rm flow] (bi) -| (w2);
+  \draw[rm flow] (w1) -- (k1);
+  \draw[rm flow] (w2) -- (k2);
+  \draw[rm flow] (k1) |- (pt.west);
+  \draw[rm flow] (k2) |- (pt.east);
+  \draw[rm ctrl] (lam) -- (pt);
+  \draw[rm flow] (pt) -- node[rm yes, right] {yes} (bs);
+  \node[rm note, anchor=north] at (0,-7.75) {$\alpha$ = \texttt{poisson\_alpha} = $10^{-6}$};
+
+  % ---- right: drift --------------------------------------------------------
+  \node[rm io, minimum width=36mm] (ci) at (7.6,0) {\texttt{net\_connect} with \texttt{bytes}\\\tiny per process-tree root};
+  \node[rm box] (bk) at (7.6,-1.45) {sum bytes per 60\,s bucket $x_t$};
+  \node[rm store, minimum width=34mm] (mu) at (10.6,-2.75) {role mean $\mu$ (EMA)\\\tiny $\sigma$ from policy};
+  \node[rm box] (zs) at (7.6,-2.75) {$z_t = (x_t-\mu)/\sigma$};
+  \node[rm sub] (cs) at (7.6,-4.15) {$S_t=\max(0,\,S_{t-1}+z_t-k)$\\\tiny $k=0.5$};
+  \node[rm dec] (ch) at (7.6,-5.65) {$S_t>h$?\\\tiny $h=5$};
+  \node[rm box] (ce) at (7.6,-7.15) {\texttt{effect\_exfil}};
+  \draw[rm flow] (ci) -- (bk);
+  \draw[rm flow] (bk) -- (zs);
+  \draw[rm ctrl] (mu) -- (zs);
+  \draw[rm flow] (zs) -- (cs);
+  \draw[rm flow] (cs) -- (ch);
+  \draw[rm flow] (ch) -- node[rm yes, right] {yes} (ce);
+
+  % ---- incident freeze ------------------------------------------------------
+  \node[rm human, minimum width=30mm] (inc) at (3.8,-9.0) {Judge: story decision $\neq$ ALLOW\\\tiny \texttt{mark\_incident(root, open)}};
+  \draw[rm back] (inc.west) -| (-3.9,-4.15) -- node[rm lbl, above] {freeze} (lam.west);
+  \draw[rm back] (inc.east) -| node[rm lbl, pos=0.75, right] {freeze} (mu.south);
+  \node[rm note, align=left, anchor=north] at (3.8,-9.55)
+    {while any incident is open every EMA baseline is frozen, so an attacker cannot teach the baseline};
+\end{tikzpicture}

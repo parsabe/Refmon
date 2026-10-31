@@ -1,0 +1,37 @@
+% Level 3b: how the policy may change: learning-mode proposals and service-desk feedback
+% (src/refmon/learning.py, tune.py, cli.py). Nothing applies without a person. Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- learning mode -------------------------------------------------------
+  \node[rm io, minimum width=30mm] (ev) at (0,0) {benign replay files /\\observe-mode events};
+  \node[rm box] (lc) at (3.6,0) {\texttt{ContractLearner}\\\tiny counts behaviour kinds per role\\\tiny for \texttt{learning.period}; judges nothing};
+  \node[rm store, minimum width=26mm] (pr) at (7.3,0) {\texttt{ContractProposal}\\\tiny one change id per allowance;\\\tiny loosening marked \texttt{relax}};
+  \node[rm store, minimum width=24mm] (bl) at (3.6,-1.55) {per-role counts\\\tiny = rarity baseline (C11.3)};
+  \draw[rm flow] (ev) -- (lc);
+  \draw[rm flow] (lc) -- (pr);
+  \draw[rm ctrl] (lc) -- (bl);
+  \node[rm note, anchor=north, align=center] at (3.6,-2.15) {surprisal and learned contracts act only once\\Good--Turing unseen mass $n_1/N < 0.01$};
+
+  % ---- feedback ------------------------------------------------------------
+  \node[rm human] (fa) at (0,-3.6) {service desk:\\``false alarm''};
+  \node[rm human] (cf) at (0,-5.0) {service desk:\\``confirmed''};
+  \node[rm box] (ep) at (3.6,-3.6) {\texttt{Tuner}: exception proposal\\\tiny rules that fired, scoped, expiring\\\tiny + contract extension if a contract broke};
+  \node[rm box] (bp) at (3.6,-5.0) {\texttt{Tuner}: block-list proposal\\\tiny fingerprints of the story's labeled objects};
+  \node[rm store, minimum width=26mm] (sug) at (7.3,-4.3) {\texttt{Suggestion}\\\tiny nothing applied yet};
+  \draw[rm hflow] (fa) -- (ep);
+  \draw[rm hflow] (cf) -- (bp);
+  \draw[rm flow] (ep.east) -- (sug.west);
+  \draw[rm flow] (bp.east) -- (sug.west);
+
+  % ---- approval and application -----------------------------------------
+  \node[rm human, minimum width=30mm] (ap) at (10.9,-2.15) {\textbf{approve}, by name\\\tiny chosen change ids;\\\tiny \texttt{relax} only if asked for};
+  \node[rm box] (apl) at (10.9,-3.75) {\texttt{apply\_proposal} /\\\texttt{apply\_suggestion}\\\tiny new policy \emph{data}};
+  \node[rm human] (sg) at (10.9,-5.25) {\texttt{refmon sign}\\\tiny key holder};
+  \node[rm stage] (ld) at (13.9,-5.25) {signed policy\\\tiny verified, then loaded};
+  \draw[rm flow] (pr.east) -| (ap.north);
+  \draw[rm flow] (sug.east) -- ++(0.35,0) |- (ap.west);
+  \draw[rm hflow] (ap) -- (apl);
+  \draw[rm flow] (apl) -- (sg);
+  \draw[rm hflow] (sg) -- (ld);
+  \node[rm note, text=rmBlockLine, anchor=north] at (12.4,-6.0) {\textbf{no step on this side runs unattended}};
+  \node[rm note, anchor=north] at (3.6,-5.45) {once signed, Observe reports \texttt{threat\_list\_hit} for them};
+\end{tikzpicture}

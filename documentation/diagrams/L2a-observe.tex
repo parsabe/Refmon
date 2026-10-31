@@ -1,0 +1,43 @@
+% Level 2a: Observe (src/refmon/pipeline/observe.py). Tall single-column figure.
+\begin{tikzpicture}[rm]
+  \node[rm raw, rounded corners=2.6mm] (st) at (0,0) {\texttt{RawEvent} arrives\\\tiny in memory, never on disk};
+  \node[rm dec] (d0) at (0,-1.3) {already an\\\texttt{Event}?};
+  \node[rm box] (pass) at (5.4,-1.3) {pass through\\\tiny (replay of post-Observe\\\tiny events)};
+  \node[rm box, minimum width=44mm] (a1) at (0,-2.65)
+    {keep allowlisted \texttt{attrs} only\\\tiny discard sensor-set outcome keys (\texttt{trusted\_source},\\\tiny \texttt{destination\_class}, \texttt{canary\_hit}, \dots): a sensor cannot claim them};
+  \node[rm dec] (d1) at (0,-3.95) {content\\present?};
+  \node[rm sub, minimum width=38mm] (a2) at (0,-5.2)
+    {$f=\texttt{hmac:}\,\mathrm{HMAC\text{-}SHA256}_{K_{dev}}\big(\mathrm{norm}(c)\big)$};
+  \node[rm dec] (d2) at (0,-6.45) {\texttt{exec}, \texttt{content\_in},\\user / admin\\input?};
+  \node[rm sub] (ft) at (3.35,-6.45) {obfuscation features\\\tiny entropy $H$, encoded ratio,\\\tiny longest whitespace run\\\tiny (numbers only)};
+  \node[rm sub, minimum width=46mm, align=left] (a3) at (0,-8.7)
+    {\textbf{Observe-time checks on raw values}\\[1pt]
+     \tiny $\bullet$ trusted source match (\texttt{content\_in}, \texttt{request\_in})\\
+     \tiny $\bullet$ \texttt{net\_connect}: host / CIDR $\to$ destination class or \texttt{unknown}\\
+     \tiny $\bullet$ \texttt{exec}: program name $\to$ executable class\\
+     \tiny $\bullet$ \texttt{asset\_access}: protected asset name\\
+     \tiny $\bullet$ threat lists: Bloom hint $\to$ confirmed on exact digest set\\
+     \tiny $\bullet$ canaries: URL path prefix, credential value};
+  \node[rm raw, minimum width=46mm] (a4) at (0,-10.5)
+    {drop raw: content, \texttt{domain}, \texttt{host}, \texttt{ip}, \texttt{url\_path},\\\texttt{program}, \texttt{signer}};
+  \node[rm store, minimum width=40mm] (a5) at (0,-12.0)
+    {\texttt{Event}: fingerprints + allowlisted scalars\\\tiny ring buffer, older than \texttt{buffer\_max\_age} evicted};
+
+  \draw[rm flow] (st) -- (d0);
+  \draw[rm flow] (d0) -- node[rm yes, above] {yes} (pass);
+  \draw[rm flow] (d0) -- node[rm no, right] {no} (a1);
+  \draw[rm flow] (a1) -- (d1);
+  \draw[rm flow] (d1) -- node[rm yes, right] {yes} (a2);
+  \draw[rm flow] (d1.west) -- node[rm no, above] {no} ++(-2.6,0) |- (a3.west);
+  \draw[rm flow] (a2) -- (d2);
+  \draw[rm flow] (d2) -- node[rm yes, above] {yes} (ft);
+  \draw[rm flow] (d2) -- node[rm no, right, pos=0.35] {no} (a3);
+  \draw[rm flow] (ft.south) |- ($(a3.north)+(0,0.3)$);
+  \draw[rm flow] (a3) -- (a4);
+  \draw[rm flow] (a4) -- (a5);
+  \draw[rm flow] (pass.south) |- (a5.east);
+
+  % the privacy wall sits between dropping raw values and emitting the Event
+  \draw[rm wall] (-3.7,-11.25) -- (4.6,-11.25);
+  \node[rm note, text=rmBlockLine, anchor=south west] at (2.7,-11.23) {privacy wall:\\no raw byte below};
+\end{tikzpicture}

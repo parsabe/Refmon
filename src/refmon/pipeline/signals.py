@@ -125,12 +125,17 @@ def extract(
         )
         d = policy.destination(dest)
         trusted = bool(d and d.trusted) and not restricted  # trust no longer excuses a connection
+        # v1.5 (A60): trust excuses only a process with no live external provenance in its lineage.
+        # Until v1.4 the label had to be at the origin threshold, so a process whose label had
+        # faded under it (or whose request had ended) could use any trusted class freely (F2).
+        proc = tagger.procs.get(ev.actor.id)
+        lineage = bool(proc and tagger.alive(proc.ever, ts))
         if allowed_classes is not None and not in_contract:
             add("contract_connect_violation")
         # v1.1 (A48): a trusted class excuses a connection only for a role whose contract lists it
         # (then it is in_contract); for any other role a labeled process connecting there is a
         # fetch. An unlabeled process of an unlisted role keeps the trust of the class.
-        if not in_contract and (not trusted or labeled_actor):
+        if not in_contract and (not trusted or labeled_actor or lineage):
             add("effect_fetch")
         if d is not None and d.internal and rates.lateral(root, role, t, ev.object.fingerprint):
             universal("may_fan_out", "effect_lateral")

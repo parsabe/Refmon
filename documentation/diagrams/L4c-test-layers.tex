@@ -1,0 +1,30 @@
+% Level 4c: the six test layers (CLAUDE.md C9) as a pyramid. Wide figure.
+% Layer i spans y = 0.8 i .. 0.8 (i+1); the half width shrinks linearly from 4.0 to 0.8.
+\begin{tikzpicture}[rm, lay/.style={draw=#1, thick}, ann/.style={rm note, anchor=west, align=left, text width=75mm}]
+  \filldraw[lay=rmStageLine, fill=rmStage]          (-4.000,0.0) -- (4.000,0.0) -- (3.467,0.8) -- (-3.467,0.8) -- cycle;
+  \filldraw[lay=rmStageLine, fill=rmStage!70]       (-3.467,0.8) -- (3.467,0.8) -- (2.933,1.6) -- (-2.933,1.6) -- cycle;
+  \filldraw[lay=rmAllowLine, fill=rmAllow]          (-2.933,1.6) -- (2.933,1.6) -- (2.400,2.4) -- (-2.400,2.4) -- cycle;
+  \filldraw[lay=rmHoldLine,  fill=rmHold]           (-2.400,2.4) -- (2.400,2.4) -- (1.867,3.2) -- (-1.867,3.2) -- cycle;
+  \filldraw[lay=rmHumanLine, fill=rmHuman]          (-1.867,3.2) -- (1.867,3.2) -- (1.333,4.0) -- (-1.333,4.0) -- cycle;
+  \filldraw[lay=rmStoreLine, fill=rmStore, densely dashed] (-1.333,4.0) -- (1.333,4.0) -- (0.800,4.8) -- (-0.800,4.8) -- cycle;
+
+  \node at (0,0.4) {\textbf{1~~unit tests}};
+  \node at (0,1.2) {\textbf{2~~property tests}};
+  \node at (0,2.0) {\textbf{3~~golden replay}};
+  \node at (0,2.8) {\textbf{4~~variants}};
+  \node at (0,3.6) {\textbf{5~~self-test}};
+  \node at (0,4.4) {\textbf{6~~lab}};
+
+  \node[ann] at (4.4,0.4) {one per rule, contract, effect type, override and policy field};
+  \node[ann] at (4.4,1.2) {Hypothesis: labels are never lost; no raw content in any output; Contain never
+                           touches an unlabeled object; unsigned policy or pack always rejected; evidence monotone in label strength};
+  \node[ann] at (4.4,2.0) {46 scenarios in \texttt{tests/golden} (\texttt{Sxx.events.jsonl} + \texttt{Sxx.expected.json}),
+                           17 attack families, coverage map C13 checked};
+  \node[ann] at (4.4,2.8) {\texttt{refmon.variants}: 6 mutation dimensions, seeded; matrix CSV in CI; every allowed
+                           malicious variant fixed or documented as a known gap (G1--G3)};
+  \node[ann] at (4.4,3.6) {in production: synthetic stories in \texttt{probe()} copies; a failure is an alert};
+  \node[ann] at (4.4,4.4) {isolated VMs with harmless stand-ins (Phase 8): \textbf{not run} (A58)};
+  \foreach \yy in {0.8,1.6,2.4,3.2,4.0} \draw[rmStoreLine!40] (4.35,\yy) -- (12.0,\yy);
+
+  \draw[->, thick, rmStoreLine] (-4.6,0.1) -- node[rm note, sloped, above] {closer to a real platform, fewer runs} (-4.6,4.7);
+\end{tikzpicture}

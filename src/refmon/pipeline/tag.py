@@ -44,6 +44,7 @@ class _Proc:
     # acts on a process that carried a live label: a worker that handled the request which led to a
     # shell is part of the story even once the request is over.
     ever: set[str] = field(default_factory=set)
+    last: float = 0.0  # time of the process's latest event (seconds), for forgetting (A62)
 
 
 class Tagger:
@@ -53,7 +54,7 @@ class Tagger:
         self.procs: dict[str, _Proc] = {}
         self.fp_labels: dict[str, set[str]] = {}
         self.pending: dict[str, set[str]] = {}  # spawner -> labels for its next new child
-        self.requests: dict[tuple[str, str], str] = {}  # (process, request fp) -> label
+        self.requests: dict[tuple[str, str], set[str]] = {}  # (process, request fp) -> labels
         self.derived: dict[tuple[str, str], str] = {}  # (parent label, object fp) -> label
         self.written_by: dict[str, str] = {}  # object fp -> process that wrote it
         self._counter = 0
@@ -108,6 +109,47 @@ class Tagger:
                 update["strength"] = min(1.0, self.strength(lid, ts))
             self.labels[lid] = label.model_copy(update=update)
 
+    def forget(self, now, older_than: float, keep_labels: set[str]) -> None:
+        """v1.5 (A62): drop what can no longer influence a decision, so a long-running pipeline
+        stays bounded: processes silent for `older_than` seconds that carry no live label and
+        have no remaining child, and labels that are dead (under the alive floor, not persistent,
+        no Contract evidence) and not named by a story still kept."""
+        cutoff = now.timestamp() - older_than
+        idle = {
+            pid
+            for pid, p in self.procs.items()
+            if p.last < cutoff and not self.alive(p.ever | p.labels, now)
+        }
+        parents = {p.parent for pid, p in self.procs.items() if pid not in idle}
+        for pid in idle - parents:
+            del self.procs[pid]
+            self.pending.pop(pid, None)
+        floor = self.policy.thresholds.label_alive_floor
+        dead = {
+            lid
+            for lid, lab in self.labels.items()
+            if not lab.persistent
+            and not lab.contract_evidence
+            and lid not in keep_labels
+            and self.strength(lid, now) < floor
+        }
+        if not dead:
+            return
+        for lid in dead:
+            del self.labels[lid]
+        for fp in list(self.fp_labels):
+            self.fp_labels[fp] -= dead
+            if not self.fp_labels[fp]:
+                del self.fp_labels[fp]
+                self.written_by.pop(fp, None)
+        self.derived = {k: v for k, v in self.derived.items() if k[0] not in dead and v not in dead}
+        self.requests = {k: v - dead for k, v in self.requests.items() if v - dead}
+        for p in self.procs.values():
+            p.labels -= dead
+            p.ever -= dead
+        for pid in list(self.pending):
+            self.pending[pid] -= dead
+
     # -- the rules --
 
     def process(self, ev: Event) -> Tagged:
@@ -124,6 +166,7 @@ class Tagger:
                 parent=parent, role=ev.actor.role, labels=set(inherited), ever=set(inherited)
             )
         proc = self.procs[pid]
+        proc.last = ts.timestamp()
         fp = ev.object.fingerprint
         new: list[str] = []
         trusted = False
@@ -133,16 +176,16 @@ class Tagger:
             if "trusted_source" in ev.attrs:  # rule 6: trusted sources create no label
                 trusted = True
             elif source in EXTERNAL_SOURCES and fp is not None:  # rule 1
-                label = self._label_for(fp, source, ts, new)
+                labels = self._labels_for(fp, source, ts, new)
                 if ev.actor.role not in self.policy.non_carrier_roles:  # rule 2
-                    proc.labels.add(label)
-                    proc.ever.add(label)
+                    proc.labels |= labels
+                    proc.ever |= labels
                 if ev.type is EventType.REQUEST_IN:
-                    self.requests[(pid, fp)] = label
+                    self.requests[(pid, fp)] = self.requests.get((pid, fp), set()) | labels
         elif ev.type is EventType.REQUEST_END and fp is not None:
             ended = self.requests.pop((pid, fp), None)
-            if ended is not None:
-                proc.labels.discard(ended)
+            if ended:
+                proc.labels -= ended
         elif ev.type is EventType.EXEC and fp is not None:  # rule 3
             hit = self.alive(self.fp_labels.get(fp, ()), ts)
             if hit:
@@ -168,10 +211,18 @@ class Tagger:
         self._counter += 1
         return f"L-{self._counter}"
 
-    def _label_for(self, fp: str, source: str, ts, new: list[str]) -> str:
+    def _labels_for(self, fp: str, source: str, ts, new: list[str]) -> set[str]:
+        """The labels external content hands to the process that ingests it: every live label its
+        fingerprint already has, or a new one.
+
+        v1.7 (A64): every live label, as rule 3 already does for an exec. Until v1.6 only the
+        strongest was handed over, and which one is strongest depends on the decay speed, so the
+        half-life changed which stories events linked into (found by the property test of
+        tests/test_v13.py). Several labels combine by noisy-OR, so nothing is counted twice.
+        """
         live = self.alive(self.fp_labels.get(fp, ()), ts)
         if live:
-            return max(live, key=lambda i: self.strength(i, ts))
+            return set(live)
         label = Label(
             label_id=self._next_id(), origin=Origin.EXTERNAL, source_class=SourceClass(source),
             created=ts, strength=1.0,
@@ -179,7 +230,7 @@ class Tagger:
         self.labels[label.label_id] = label
         self.fp_labels.setdefault(fp, set()).add(label.label_id)
         new.append(label.label_id)
-        return label.label_id
+        return {label.label_id}
 
     def _derive(self, parent_id: str, fp: str, ts, persistent: bool, edge: str = "write") -> str:
         key = (parent_id, fp)

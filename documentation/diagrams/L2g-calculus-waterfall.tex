@@ -1,0 +1,70 @@
+% Level 2g: the evidence calculus as a waterfall (C11.4, C11.5), default weights.
+% Each column starts at the prior L0 = -6.91 nats and adds the largest contribution per question.
+% y coordinates are raw log-odds in nats (y unit 0.62 cm). The last column is illustrative
+% (Origin + threat list, no Contract signal) and shows the contract gate.
+\begin{tikzpicture}[rm, y=0.62cm,
+    ori/.style={fill=rmHuman, draw=rmHumanLine},
+    con/.style={fill=rmStage, draw=rmStageLine},
+    eff/.style={fill=rmHold, draw=rmHoldLine},
+    lv/.style={font=\tiny\sffamily, inner sep=1pt}]
+  % decision bands
+  \fill[rmAllow!55] (0,-7.3)   rectangle (11.4,-4.942);
+  \fill[rmHold!70]  (0,-4.942) rectangle (11.4,-3.912);
+  \fill[rmBlock!60] (0,-3.912) rectangle (11.4,1.0);
+  \node[lv, text=rmAllowLine, anchor=south west] at (0.08,-7.28) {\textbf{allow}};
+  \node[lv, text=rmHoldLine,  anchor=south west] at (0.08,-4.92) {\textbf{hold}};
+  \node[lv, text=rmBlockLine, anchor=north west] at (0.08,0.95)  {\textbf{block} (needs a Contract signal)};
+  % axis and thresholds
+  \draw[->] (0,-7.3) -- (0,1.35) node[above, rm note] {$L$ (nats)};
+  \foreach \yy in {-7,-6,-5,-4,-3,-2,-1,0} \draw (0,\yy) -- ++(-0.08,0) node[left, rm note] {$\yy$};
+  \draw[densely dashed, rmHoldLine, thick]  (0,-4.942) -- (11.4,-4.942);
+  \draw[densely dashed, rmBlockLine, thick] (0,-3.912) -- (11.4,-3.912);
+  \draw[densely dotted, rmStoreLine]        (0,-6.907) -- (11.4,-6.907);
+  \node[lv, text=rmHoldLine,  anchor=north west] at (11.45,-4.942) {$\tau_h=-4.94$};
+  \node[lv, text=rmBlockLine, anchor=south west] at (11.45,-3.912) {$\tau_b=-3.91$};
+  \node[lv, text=rmStoreLine, anchor=north west] at (11.45,-6.907) {$L_0=-6.91$};
+
+  % \wbar{x}{from}{to}{style}{label}: one contribution as a bar segment
+  \newcommand{\wbar}[5]{\draw[#4] (#1-0.32,#2) rectangle (#1+0.32,#3);
+                        \node[lv] at ($(#1,#2)!0.5!(#1,#3)$) {#5};}
+  % S11: developer copies a doc command, local effect
+  \wbar{1.0}{-6.907}{-6.107}{ori}{0.8}
+  \wbar{1.0}{-6.107}{-5.107}{con}{1.0}
+  % S05: command typed by hand (no label), fetch only
+  \wbar{2.9}{-6.907}{-4.407}{eff}{2.5}
+  % S01: ClickFix pasted into the run dialog
+  \wbar{4.8}{-6.907}{-6.107}{ori}{0.8}
+  \wbar{4.8}{-6.107}{-5.107}{con}{1.0}
+  \wbar{4.8}{-5.107}{-2.607}{eff}{2.5}
+  % S13: web worker spawns a shell
+  \wbar{6.7}{-6.907}{-6.107}{ori}{0.8}
+  \wbar{6.7}{-6.107}{-3.107}{con}{3.0}
+  \wbar{6.7}{-3.107}{-0.607}{eff}{2.5}
+  % S14: web worker writes a web shell
+  \wbar{8.6}{-6.907}{-6.107}{ori}{0.8}
+  \wbar{8.6}{-6.107}{-2.607}{con}{3.5}
+  \wbar{8.6}{-2.607}{-0.107}{eff}{2.5}
+  % illustrative: Origin + threat-list hit, no Contract signal
+  \wbar{10.5}{-6.907}{-6.107}{ori}{0.8}
+  \wbar{10.5}{-6.107}{-1.607}{eff}{4.5}
+
+  % end points and outcomes
+  \foreach \xx/\yy/\res/\col in {1.0/-5.11/ALLOW/rmAllowLine, 2.9/-4.41/HOLD/rmHoldLine,
+                                 4.8/-2.61/BLOCK/rmBlockLine, 6.7/-0.61/BLOCK/rmBlockLine,
+                                 8.6/-0.11/BLOCK/rmBlockLine, 10.5/-1.61/{HOLD (gate)}/rmHoldLine} {
+    \draw[thick, draw=\col] (\xx-0.42,\yy) -- (\xx+0.42,\yy);
+    \node[lv, text=\col, above=1pt] at (\xx,\yy) {\textbf{\res}\\$\yy$};
+  }
+
+  % scenario names
+  \foreach \xx/\nm/\ds in {1.0/S11/{doc command,\\local effect}, 2.9/S05/{typed from\\a video},
+                           4.8/S01/{ClickFix\\paste}, 6.7/S13/{web worker\\spawns shell},
+                           8.6/S14/{web shell\\drop}, 10.5/{illustrative}/{Origin + threat\\list, no Contract}} {
+    \node[lv, anchor=north] at (\xx,-7.4) {\textbf{\nm}\\\ds};
+  }
+  % legend
+  \draw[ori] (1.2,1.75) rectangle ++(0.3,0.45);  \node[lv, anchor=west] at (1.55,1.97) {Origin};
+  \draw[con] (2.7,1.75) rectangle ++(0.3,0.45);  \node[lv, anchor=west] at (3.05,1.97) {Contract (max)};
+  \draw[eff] (4.9,1.75) rectangle ++(0.3,0.45);  \node[lv, anchor=west] at (5.25,1.97) {Effect (max)};
+  \node[lv, anchor=west] at (7.0,1.97) {bar labels: $w_j\,s_j$ in nats};
+\end{tikzpicture}

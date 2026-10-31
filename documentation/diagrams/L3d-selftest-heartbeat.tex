@@ -1,0 +1,52 @@
+% Level 3d: continuous self-test and heartbeat (src/refmon/selftest.py, heartbeat.py, alerts.py).
+\begin{tikzpicture}[rm]
+  % ---- self-test --------------------------------------------------------
+  \node[rm box]  (sch) at (0,0)     {\texttt{SelfTestScheduler.tick}\\\tiny due every \texttt{self\_test.interval} (6\,h)};
+  \node[rm store, minimum width=30mm] (int) at (0,-1.35) {intent = signed policy\\\tiny what \emph{should} work};
+  \node[rm box]  (cat) at (0,-2.65) {catalog: one harmless synthetic\\story per protection};
+  \node[rm dec]  (d1)  at (0,-3.95) {case applies\\to the policy?};
+  \node[rm term] (sk1) at (3.4,-3.95) {skipped\\\tiny (contract not in policy)};
+  \node[rm dec]  (d2)  at (0,-5.35) {enabled in the\\signed policy?};
+  \node[rm term] (sk2) at (3.4,-5.35) {skipped\\\tiny listed in the heartbeat};
+  \node[rm sub]  (prb) at (0,-6.75) {\texttt{Pipeline.probe()}: deep copy\\\tiny live policy, rates, baseline and code;\\\tiny recording notifier, no enforcer, no report};
+  \node[rm box]  (inj) at (0,-8.05) {inject the story as device \texttt{selftest-}$n$\\\tiny placeholder fingerprints only};
+  \node[rm dec]  (d3)  at (0,-9.35) {expected\\outcome?};
+  \node[rm allow] (pas) at (3.4,-9.35) {pass};
+  \node[rm raw]  (al1) at (0,-10.75) {\textbf{alert}: protection X is not working};
+  \node[rm store, minimum width=26mm] (rep) at (3.9,-12.0) {\texttt{SelfTestReport}};
+
+  \draw[rm flow] (sch) -- (int);
+  \draw[rm flow] (int) -- (cat);
+  \draw[rm flow] (cat) -- (d1);
+  \draw[rm flow] (d1) -- node[rm no, above] {no} (sk1);
+  \draw[rm flow] (d1) -- node[rm yes, right] {yes} (d2);
+  \draw[rm flow] (d2) -- node[rm no, above] {no} (sk2);
+  \draw[rm flow] (d2) -- node[rm yes, right] {yes} (prb);
+  \draw[rm flow] (prb) -- (inj);
+  \draw[rm flow] (inj) -- (d3);
+  \draw[rm flow] (d3) -- node[rm yes, above] {yes} (pas);
+  \draw[rm flow] (d3) -- node[rm no, right] {no} (al1);
+  \draw[rm flow] (pas.south) -- (pas.south |- rep.north);
+  \draw[rm flow] (al1.south) |- (rep.west);
+  \node[rm note, align=left, anchor=west, text width=40mm] at (2.25,-6.75)
+    {a protection switched off or broken in the live pipeline is switched off or broken in the copy;
+     tests never become incidents};
+
+  % ---- heartbeat ---------------------------------------------------------
+  \node[rm io, minimum width=32mm] (cap) at (8.4,-9.6) {sensor capabilities\\\tiny e.g. cannot check signatures};
+  \node[rm box, align=left] (hb) at (8.4,-12.0)
+    {\texttt{heartbeat.build}\\[1pt]
+     \tiny alive; policy version and digest; self-test status;\\
+     \tiny protections switched off; \textbf{degraded} capabilities};
+  \node[rm box] (mon) at (8.4,-13.75) {\texttt{HeartbeatMonitor}\\\tiny expected devices, last time heard};
+  \node[rm dec] (d4) at (12.3,-13.75) {silent too\\long?};
+  \node[rm raw] (al2) at (12.3,-15.15) {\textbf{alert}: missing heartbeat\\\tiny once per silence};
+  \draw[rm flow] (rep) -- (hb);
+  \draw[rm flow] (cap) -- (hb);
+  \draw[rm flow] (hb) -- node[rm lbl, right] {pseudonymized device, no content} (mon);
+  \draw[rm flow] (mon) -- (d4);
+  \draw[rm flow] (d4) -- node[rm yes, right] {yes} (al2);
+  \node[rm note, align=left, anchor=south, text width=46mm] at (8.4,-8.95)
+    {Missing information never generates evidence: a signal that needs a missing capability is
+     \emph{absent}, and the gap is reported here as degraded protection.};
+\end{tikzpicture}

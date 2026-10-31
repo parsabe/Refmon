@@ -1,0 +1,42 @@
+% Level 5a: the live command barrier, refmon guard (src/refmon/live.py guard_command). Wide figure.
+\begin{tikzpicture}[rm]
+  \node[rm human] (cli) at (-1.6,0) {\texttt{refmon guard -- CMD}};
+  \node[rm human] (ui)  at (1.6,0)  {dashboard / HTTP API};
+  \node[rm dec] (dm) at (0,-1.35) {daemon\\running?};
+  \node[rm box] (http) at (-3.3,-2.6) {POST to \texttt{refmon serve}\\\tiny local daemon, API token required};
+  \node[rm box] (inp)  at (3.3,-2.6)  {in-process\\\texttt{LiveBarrier}};
+  \node[rm sub, minimum width=56mm] (prs) at (0,-3.75) {\texttt{guard\_command}: parse program, hosts, URL paths;\\\tiny encoded payload or pipe-to-shell pattern?};
+  \node[rm raw, align=left, minimum width=56mm] (syn) at (0,-5.45)
+    {\textbf{synthesize RawEvents} (in memory only)\\[1pt]
+     \tiny $\bullet$ origin given: \texttt{content\_in}, or \texttt{request\_in} for an inbound request\\
+     \tiny $\bullet$ \texttt{exec} (program, \texttt{encoded\_payload})\\
+     \tiny $\bullet$ one \texttt{net\_connect} per host\\
+     \tiny $\bullet$ \texttt{asset\_access} for a canary or a secrets path\\
+     \tiny $\bullet$ \texttt{security\_tamper} (Refmon itself $\to$ self-tamper), \texttt{priv\_change}, \texttt{persist}};
+  \node[rm stage, minimum width=56mm] (pip) at (0,-7.25) {\textbf{Pipeline}: Observe $\to$ Tag $\to$ Link $\to$ Judge $\to$ Gate\\\tiny raw content is fingerprinted at once};
+  \node[rm dec] (bb) at (0,-8.75) {mode block and\\BLOCK or HOLD?};
+  \node[rm block] (ref) at (4.2,-8.75) {refused\\\mdseries\tiny \texttt{executed=False}};
+  \node[rm dec] (ex) at (0,-10.25) {execution asked\\and ALLOW?};
+  \node[rm box] (run) at (0,-11.6) {\texttt{subprocess.run} in the workspace\\\tiny timeout 5\,s, output cut to 400 chars};
+  \node[rm box] (only) at (-3.6,-10.25) {verdict only};
+  \node[rm io, minimum width=95mm] (out) at (0,-12.95) {\texttt{GuardOutcome}: decision, $L$, failed questions, signals, explanation};
+  \node[rm store, minimum width=40mm] (log) at (0,-14.25) {live log + dashboard\\\tiny fingerprints only (\texttt{hmac:...})};
+
+  \draw[rm hflow] (cli.south) -- ++(0,-0.25) -| (dm.north);
+  \draw[rm hflow] (ui.south)  -- ++(0,-0.25) -| (dm.north);
+  \draw[rm flow] (dm.west) -| node[rm yes, above, pos=0.25] {yes} (http.north);
+  \draw[rm flow] (dm.east) -| node[rm no, above, pos=0.25] {no} (inp.north);
+  \draw[rm flow] (http.south) |- (prs.west);
+  \draw[rm flow] (inp.south)  |- (prs.east);
+  \draw[rm flow] (prs) -- (syn);
+  \draw[rm flow] (syn) -- (pip);
+  \draw[rm flow] (pip) -- (bb);
+  \draw[rm flow] (bb) -- node[rm yes, above] {yes} (ref);
+  \draw[rm flow] (bb) -- node[rm no, right] {no} (ex);
+  \draw[rm flow] (ex) -- node[rm yes, right] {yes} (run);
+  \draw[rm flow] (ex) -- node[rm no, above] {no} (only);
+  \draw[rm flow] (ref.south) -- (ref.south |- out.north);
+  \draw[rm flow] (run) -- (out);
+  \draw[rm flow] (only.south) -- (only.south |- out.north);
+  \draw[rm flow] (out) -- (log);
+\end{tikzpicture}

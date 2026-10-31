@@ -148,6 +148,21 @@ class Gate:
                 )  # fmt: skip
         return out
 
+    def open_hold_stories(self) -> set[str]:
+        return {c.story_id for c in self.holds.values() if c.state is HoldState.PENDING}
+
+    def forget(self, story_ids: set[str]) -> None:
+        """v1.5 (A62): drop the state of stories the pipeline no longer keeps (never a story
+        with a pending hold). The action keys stay, so no object is ever acted on twice."""
+        for sid in story_ids:
+            self._stories.pop(sid, None)
+            self._records.pop(sid, None)
+            self._last.pop(sid, None)
+            self._device.pop(sid, None)
+        for hid in [h for h, c in self.holds.items() if c.story_id in story_ids]:
+            if self.holds[hid].state is not HoldState.PENDING:
+                del self.holds[hid]
+
     # -- answers from people -------------------------------------------------------------------
 
     def answer_user(self, hold_id: str, answer: str, now: datetime) -> Resolution:

@@ -1,0 +1,59 @@
+% Level 2c: a worked provenance graph, golden scenario S06 (tests/golden/S06.*).
+% Persistence now, payload runs a day later: labels, inheritance, a persistent label and the
+% Contract evidence it carries into a later story (rules 1-7, D21). Wide figure.
+\begin{tikzpicture}[rm,
+    proc/.style={rm stage, minimum height=8mm, minimum width=20mm},
+    obj/.style={rm box, rounded corners=1pt, fill=rmStore, minimum height=8mm, minimum width=20mm},
+    badge/.style={circle, draw=rmHumanLine, fill=rmHuman, font=\tiny\sffamily\bfseries,
+                  inner sep=0.6pt, minimum size=4mm},
+    pedge/.style={rm flow, thick}]
+  % ---------------- story st-1 ----------------------------------------------
+  \node[obj]  (n1) at (0,0)    {web page\\\tiny \texttt{content\_in}, browser};
+  \node[obj]  (n2) at (2.95,0) {clipboard text\\\tiny \texttt{content\_in} (\texttt{web})};
+  \node[proc] (n3) at (5.9,0)  {interactive shell\\\tiny p-601};
+  \node[proc] (n4) at (8.85,0) {script host\\\tiny p-602, child};
+  \node[obj]  (n5) at (11.8,0) {startup item\\\tiny scheduled task};
+  \draw[pedge] (n1) -- (n2);
+  \draw[pedge] (n2) -- node[rm lbl, above=2pt] {paste + \texttt{exec}} (n3);
+  \draw[pedge] (n3) -- node[rm lbl, above=2pt] {spawn} (n4);
+  \draw[pedge] (n4) -- node[rm lbl, above=2pt] {\texttt{persist}} (n5);
+  \node[badge] at (n2.north east) {L1};
+  \node[badge] at (n3.north east) {L1};
+  \node[badge] at (n4.north east) {L1};
+  \node[badge, fill=rmAllow, draw=rmAllowLine] at (n5.north east) {L2};
+  \node[rm note, below=1pt] at (n2.south) {rule 1: $s_0=1$};
+  \node[rm note, below=1pt] at (n3.south) {rule 3: text matches L1};
+  \node[rm note, below=1pt] at (n4.south) {rules 3, 4: inherits};
+  \node[rm note, below=1pt] at (n5.south) {rule 5: persistent};
+  \node[rm note, align=left, anchor=north west] (ev1) at (-1.0,-1.25)
+    {\textbf{st-1}:\  Origin L1 \ $\cdot$\  Contract \rmC{contract\_external\_exec} \ $\cdot$\  Effect \rmE{effect\_persist}
+     \ $\Rightarrow$ 3 fails, \textbf{BLOCK}: kill p-602, revert the startup item};
+  \node[rm note, text=rmHumanLine, align=right, anchor=north east] at (11.55,-1.2)
+    {D21: L2 records the Contract\\signals of st-1 as its evidence};
+
+  % ---------------- story st-2 (a day later) --------------------------------
+  \node[proc] (n6) at (11.8,-3.3) {scheduler\\\tiny p-9001 runs the item};
+  \node[proc] (n7) at (8.85,-3.3) {script host\\\tiny p-9002, child};
+  \node[obj]  (n8) at (5.3,-2.75)  {unknown host\\\tiny \texttt{net\_connect}};
+  \node[obj]  (n9) at (5.3,-3.85)  {new executable\\\tiny \texttt{file\_write}, temp dir};
+  \draw[rm back] (n5) -- node[rm lbl, right] {a day later: new story,\\same persistent label} (n6);
+  \draw[pedge] (n6) -- node[rm lbl, above=2pt] {spawn} (n7);
+  \draw[pedge] (n7.west) -- ++(-0.5,0) |- (n8.east);
+  \draw[pedge] (n7.west) -- ++(-0.5,0) |- (n9.east);
+  \node[badge, fill=rmAllow, draw=rmAllowLine] at (n6.north east) {L2};
+  \node[badge, fill=rmAllow, draw=rmAllowLine] at (n7.north east) {L2};
+  \node[rm block, align=left, minimum width=30mm] (v2) at (1.55,-3.3)
+    {BLOCK at the delayed run\\\mdseries\tiny kill p-9002, cut its network,\\\tiny quarantine the file};
+  \draw[rm bad] (n8.west) -- (v2.east |- n8.west);
+  \draw[rm bad] (n9.west) -- (v2.east |- n9.west);
+  \node[rm note, align=left, anchor=north west] at (-1.0,-4.6)
+    {\textbf{st-2}:\  Origin L2 (persistent, no decay) \ $\cdot$\  Contract \rmC{contract\_external\_exec} \emph{carried by L2} \ $\cdot$\ 
+     Effect \rmE{effect\_fetch} \ $\Rightarrow$ \textbf{BLOCK}};
+
+  \begin{scope}[on background layer]
+    \node[rm group, fill=rmStage!8,  fit=(n1)(n5)(ev1)] (g1) {};
+    \node[rm group, fill=rmBlock!25, fit=(n6)(n9)(v2)] (g2) {};
+  \end{scope}
+  \node[rm group label] at (g1.north west) {story st-1 \quad 10:02};
+  \node[rm group label] at (g2.north west) {story st-2 \quad a day later (quiet window long over)};
+\end{tikzpicture}

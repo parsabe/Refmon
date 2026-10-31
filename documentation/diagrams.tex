@@ -1,0 +1,174 @@
+% ============================================================================
+% Refmon: pipeline shapes, diagrams and flowcharts, level by level.
+% Build:  make diagrams      (or: pdflatex diagrams.tex, twice)
+% Every figure is a plain tikzpicture in diagrams/<name>.tex, so main.tex can
+% reuse any of them:   \input{diagrams/styles}  (once, in the preamble)
+%                      \begin{figure*}[!t]\centering
+%                        \adjustbox{max width=\textwidth}{\input{diagrams/L1-core-pipeline}}
+%                        \caption{...}\end{figure*}
+% ============================================================================
+\documentclass[10pt,letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=0.72in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{adjustbox}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,urlcolor=blue!65!black]{hyperref}
+
+\input{diagrams/styles}
+
+% \rmdiagram{file}{caption}  ->  figure with label fig:<file>, scaled down only if too large
+\newcommand{\rmdiagram}[2]{%
+  \begin{figure}[!htbp]
+    \centering
+    \adjustbox{max width=\linewidth, max totalheight=0.86\textheight}{\input{diagrams/#1}}%
+    \caption{#2}\label{fig:#1}
+  \end{figure}}
+
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+
+\title{\bfseries Refmon (Provenance Gate v2)\\[2pt]\large Pipeline shapes, diagrams and flowcharts, level by level}
+\author{Companion to the Refmon paper (\texttt{main.tex}); drawn from the source in \texttt{src/refmon/}}
+\date{Specification tag \texttt{v1.3}}
+
+\begin{document}
+\maketitle
+
+\noindent The figures go from the outside in. \textbf{Level~0} places Refmon among sensors, enforcers and
+people; \textbf{Level~1} follows one event through \texttt{Pipeline.process}; \textbf{Level~2} opens every
+stage; \textbf{Level~3} shows how the policy is governed and what leaves a device; \textbf{Level~4} shows
+how the results are produced; \textbf{Level~5} shows the live user-space deployment. Every node names the
+module or function it stands for, and every figure is a stand-alone \texttt{tikzpicture} in
+\texttt{diagrams/}.
+
+\rmdiagram{legend}{Shapes and arrows used in every figure. Blue chips are Contract signals, orange chips
+Effect signals, red chips override flags.}
+
+\tableofcontents
+\listoffigures
+\clearpage
+
+% ============================================================================
+\section{Level 0: system context}
+Only two interfaces touch a platform: \texttt{Sensor.emit(sink)} and \texttt{Enforcer.act(Action)}
+(CLAUDE.md C1). Everything between them is platform-independent, and raw content never crosses the
+privacy wall after \texttt{Observe}.
+
+\rmdiagram{L0-system-context}{System context. Five kinds of sensor feed the platform-independent core;
+the signed policy, the Exposure overlay and the self-test sit beside it on the device. Actions go to the
+enforcer adapter, hold prompts to people, and only pseudonymized verdicts, heartbeats and noisy counts
+leave the device.}
+
+% ============================================================================
+\clearpage
+\section{Level 1: one event through the core}
+\rmdiagram{L1-core-pipeline}{One call of \texttt{Pipeline.process(event)}. After the judgement, the
+rate baselines are frozen while the story is not allowed, and the labels behind a Contract signal stop
+decaying (dashed feedback into shared state). A verdict is emitted only when the decision changed and is
+not ALLOW; the Gate then resolves expired holds and acts on the story.}
+
+% ============================================================================
+\clearpage
+\section{Level 2: inside each stage}
+\subsection{Observe}
+\rmdiagram{L2a-observe}{Observe, the only stage that sees raw content. Outcome attributes a sensor sets
+itself are discarded; content becomes a keyed HMAC fingerprint; obfuscation features are kept as
+numbers; every decision that needs a raw host, URL, program or signer is made here; then the raw values
+are dropped.}
+
+\subsection{Tag}
+\rmdiagram{L2b-tag-rules}{Tag: propagation rules 1--7 as a dispatch on the event type. A ``no'' at any
+other decision leaves the labels unchanged. Rule 7 (persistent labels carry Contract evidence) is applied
+by the pipeline after the judgement (Figure~\ref{fig:L1-core-pipeline}).}
+
+\rmdiagram{L2b2-label-strength}{(a) Label strength over time: an ordinary label halves every 30 minutes
+and stops failing Origin at $\theta_{ori}=0.5$; a persistent label never decays; a label behind a
+Contract signal is frozen at the strength it had (A49). (b) The F8 fix: up to v1.2 a Contract or Effect
+signal counted at the label's strength above $\theta_{ori}$ and at full strength below it, so a weaker
+label could give more evidence; since v1.3 it always counts at full strength.}
+
+\rmdiagram{L2c-provenance-S06}{A worked provenance graph, golden scenario S06 (persistence now, payload a
+day later). The startup item gets a persistent label L2 that records the Contract signals of the first
+story (D21), so the delayed run, a new story with no paste in it, still fails all three questions.}
+
+\subsection{Link}
+\rmdiagram{L2d-link}{Link: an event joins every open story that shares a key with it within the quiet
+window; several such stories are merged.}
+
+\subsection{Signals}
+\rmdiagram{L2e-signals}{Signal extraction per event type (\texttt{signals.py}). The prefix of a signal
+name is its question; the weight of each signal in nats is in the signed policy.}
+
+\subsection{Judge and the evidence calculus}
+\rmdiagram{L2f-judge}{Judge: effective signals, overrides in priority order, the plain 3/2/1 rule, and
+the evidence calculus with the contract gate.}
+
+\rmdiagram{L2g-calculus-waterfall}{The calculus with the default weights. Each column starts at the prior
+$L_0=-6.91$ nats and adds the largest contribution of each question; the bands are the cost-derived
+thresholds. The last column is illustrative: it crosses $\tau_b$ without a Contract signal, so the
+contract gate caps it at HOLD.}
+
+\rmdiagram{L2h-rates}{Rate tests behind \texttt{mass\_change}, \texttt{lateral}, repeated
+\texttt{response\_anomaly} (Poisson tail over a short and a long window) and \texttt{exfil} (CUSUM over
+standardized volume). All baselines freeze while an incident is open.}
+
+\subsection{Gate and Contain}
+\rmdiagram{L2i-gate}{\texttt{Gate.handle} for one judged story: the mode downgrade (observe never acts,
+warn never blocks), blocks, and the start or extension of a hold. Expired holds follow the hold state
+machine of the paper (endpoint: stop; server: stay quarantined).}
+
+\rmdiagram{L2j-contain}{\texttt{Contain.plan}: only labeled processes and what they wrote are touched;
+when nothing is labeled, the processes that produced the signals are, but never a channel role.}
+
+% ============================================================================
+\clearpage
+\section{Level 3: governance and privacy}
+\rmdiagram{L3a-policy-lifecycle}{The signed policy from key to running pipeline. Any failed check keeps the
+last valid policy; the Exposure overlay only tightens it.}
+
+\rmdiagram{L3b-learning-tune}{How the policy may change: learning-mode contract proposals and service-desk
+feedback become proposals, a named person approves chosen changes, and the result still has to be signed.}
+
+\rmdiagram{L3c-exposure}{Exposure stage: every component gets one state, and an end-of-life or exposed
+component escalates its own role only (virtual patching). Scenarios S16, S28 and S29.}
+
+\rmdiagram{L3d-selftest-heartbeat}{Continuous self-test in an isolated copy of the live pipeline, and the
+heartbeat that reports switched-off protections and degraded sensor capabilities.}
+
+\rmdiagram{L3e-privacy-reporting}{What leaves a device and how: plain-language reports under pseudonyms,
+dashboard counts with $k$-anonymity and Laplace noise, re-identification only with two approvers and an
+audit log, and the adversarial privacy audit over all outputs.}
+
+% ============================================================================
+\clearpage
+\section{Level 4: evaluation}
+\rmdiagram{L4a-reproduce}{\texttt{make reproduce}: one seeded variant file replayed in every tagged
+version, compared, checked against the committed per-variant data, and written into
+\texttt{docs/results.md} together with the golden, coverage, audit, publishability and test results.}
+
+\rmdiagram{L4b-phases-versions}{Build phases (top) and the version history (bottom): each version answers
+the findings of the previous evaluation and is measured on a seed recorded before the change.
+``Contained'' is block plus effective hold on the 633 malicious variants of seed 654514256.}
+
+\rmdiagram{L4c-test-layers}{The six test layers of the specification (C9).}
+
+% ============================================================================
+\clearpage
+\section{Level 5: live user-space deployment}
+\rmdiagram{L5a-live-guard}{The live command barrier (\texttt{refmon guard}). The command is turned into
+synthetic raw events, judged by the unchanged pipeline, and run only if the barrier allows it.}
+
+\rmdiagram{L5b-sandbox-watcher}{The sandbox watcher of \texttt{refmon serve}: files dropped into the web
+root are judged as web-worker writes and quarantined on a block or hold; workspace bursts are judged as
+mass change.}
+
+\rmdiagram{L5c-rootkit}{The read-only rootkit scanner. Cross-view engines are intersected over $m$ passes
+so transient churn drops out; findings are fingerprinted, then scored twice: directly by the calculus and
+through the pipeline.}
+
+\end{document}

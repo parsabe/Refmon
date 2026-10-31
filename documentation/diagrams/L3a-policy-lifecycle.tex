@@ -1,0 +1,55 @@
+% Level 3a: the signed policy, from key to running pipeline
+% (src/refmon/cli.py, signing.py, policy_io.py, rulepacks.py, exposure.py). Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- humans: offline, hold the key ----------------------------------------
+  \node[rm human] (kg) at (0,0)    {\texttt{refmon keygen}\\\tiny Ed25519 key pair};
+  \node[rm human] (ip) at (2.9,0)  {\texttt{refmon init-policy}\\\tiny reference policy};
+  \node[rm human] (ed) at (5.9,0)  {edit the YAML\\\tiny or apply an approved proposal};
+  \node[rm human] (sg) at (8.9,0)  {\texttt{refmon sign}\\\tiny over canonical JSON};
+  \node[rm store] (pk) at (11.9,0) {rule packs\\\tiny signed, versioned};
+  \draw[rm hflow] (kg) -- (ip);
+  \draw[rm hflow] (ip) -- (ed);
+  \draw[rm hflow] (ed) -- (sg);
+
+  % ---- device: loading ------------------------------------------------------
+  \node[rm box]  (ld) at (0,-2.9)    {\texttt{load\_policy}\\\tiny or \texttt{reload()}};
+  \node[rm dec]  (d1) at (2.5,-2.9)  {signature\\valid?};
+  \node[rm dec]  (d2) at (5.2,-2.9)  {packs signed\\and pinned?};
+  \node[rm dec]  (d3) at (7.9,-2.9)  {weakening or\\downgrade?};
+  \node[rm dec]  (d4) at (10.6,-2.9) {schema\\valid?};
+  \node[rm store, minimum width=22mm] (ps) at (13.2,-2.9) {\texttt{PolicyStore}\\\tiny policy in force + digest};
+  \draw[rm flow] (sg.south) -- ++(0,-0.75) -| node[rm lbl, pos=0.25] {\texttt{policy.yaml} + detached signature} (ld.north);
+  \draw[rm flow] (pk.south) -- ++(0,-1.25) -| (d2.north);
+  \draw[rm flow] (ld) -- (d1);
+  \draw[rm flow] (d1) -- node[rm yes, above] {yes} (d2);
+  \draw[rm flow] (d2) -- node[rm yes, above] {yes} (d3);
+  \draw[rm flow] (d3) -- node[rm no, above] {no} (d4);
+  \draw[rm flow] (d4) -- node[rm yes, above] {yes} (ps);
+
+  \node[rm raw, minimum width=92mm] (rj) at (6.55,-4.75)
+    {rejected: \texttt{PolicyRejected} / \texttt{PackRejected} / \texttt{PackWeakens} (\texttt{code} says why)\\
+     \tiny the last valid policy stays in force; the rejection is recorded and raised as an alert};
+  \draw[rm bad] (d1.south) -- node[rm no, right] {no} (d1.south |- rj.north);
+  \draw[rm bad] (d2.south) -- node[rm no, right] {no} (d2.south |- rj.north);
+  \draw[rm bad] (d3.south) -- node[rm yes, text=rmBlockLine, right] {yes} (d3.south |- rj.north);
+  \draw[rm bad] (d4.south) -- node[rm no, right] {no} (d4.south |- rj.north);
+
+  % ---- effective policy ------------------------------------------------------
+  \node[rm box] (ex) at (13.2,-4.6) {\texttt{ExposureManager.overlay}\\\tiny tightens exposed roles only};
+  \node[rm stage] (sp) at (13.2,-6.0) {\texttt{Pipeline.set\_policy}\\\tiny every stage; threat lists rebuilt if changed};
+  \draw[rm flow] (ps) -- (ex);
+  \draw[rm flow] (ex) -- node[rm lbl, right] {effective policy} (sp);
+
+  \begin{scope}[on background layer]
+    \node[rm lane=rmHuman!35, fit=(kg)(pk)] (lh) {};
+    \node[rm lane=rmStage!25, fit=(ld)(ps)(rj)(sp)] (lv) {};
+  \end{scope}
+  \node[rm group label, text=rmHumanLine] at (lh.north west) {people holding the key (offline)};
+  \node[rm group label] at (lv.north west) {device};
+  \node[rm note, align=left, anchor=north west, text width=88mm] at (2.1,-5.6)
+    {Signatures are checked against a list of trusted public keys. A pack is pinned by name,
+     version and signature; it may add roles, contracts and rule settings and may tighten, but a
+     change that loosens (lower mode, rule off, longer allow-list) needs a \texttt{pack\_approvals}
+     entry inside the signed policy, and a pack older than the one in force is refused.
+     Nothing in the pipeline writes or signs a policy.};
+\end{tikzpicture}

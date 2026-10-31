@@ -1,0 +1,42 @@
+% Level 4a: make reproduce (scripts/reproduce.py and the scripts it calls). Wide figure.
+\begin{tikzpicture}[rm, ver/.style={rm stage, minimum width=22mm, minimum height=5.5mm, inner sep=1pt}]
+  \node[rm store, minimum width=28mm] (seed) at (0,0) {\texttt{variant-seeds.md}\\\tiny seed recorded \emph{before}\\\tiny any rule change};
+  \node[rm box] (gen) at (3.35,0) {\texttt{generate\_variants.py}\\\tiny 46 golden files $\times$ 6 dimensions\\\tiny + seeded combinations\\\tiny + benign variants (A56)};
+  \node[rm store, minimum width=24mm] (vf) at (6.55,0) {\texttt{variants.jsonl}\\\tiny generated once};
+  \node[ver] (v0) at (9.35, 1.05) {\texttt{v1.0} (frozen)};
+  \node[ver] (v1) at (9.35, 0.35) {\texttt{v1.1}};
+  \node[ver] (v2) at (9.35,-0.35) {\texttt{v1.2}};
+  \node[ver] (v3) at (9.35,-1.05) {\texttt{v1.3}};
+  \node[rm note, anchor=south] at (9.35,1.4) {git tags extracted, the \emph{same} file\\replayed in each (\texttt{dump\_matrix.py})};
+  \node[rm box] (cmp) at (12.6,0) {\texttt{compare\_versions.py}\\\tiny block / effective hold /\\\tiny hold pauses nothing / allow;\\\tiny benign: neutral vs.\ labelled};
+  \node[rm box] (st) at (12.6,-1.65) {\texttt{evalstats}\\\tiny Wilson 95\,\% intervals,\\\tiny exact McNemar test};
+  \node[rm dec] (chk) at (12.6,-3.2) {equal to committed\\\texttt{docs/evaluation}?};
+  \node[rm raw] (mm) at (12.6,-4.65) {mismatch: run fails};
+
+  \draw[rm flow] (seed) -- (gen);
+  \draw[rm flow] (gen) -- (vf);
+  \foreach \vv in {v0,v1,v2,v3} {
+    \draw[rm flow] (vf.east) -- (\vv.west);
+    \draw[rm flow] (\vv.east) -- (cmp.west);
+  }
+  \draw[rm flow] (cmp) -- (st);
+  \draw[rm flow] (st) -- (chk);
+  \draw[rm flow] (chk) -- node[rm no, right] {no} (mm);
+
+  % side checks
+  \node[rm box] (gl)  at (0,-3.2)   {golden catalog\\\tiny in every version};
+  \node[rm box] (cov) at (2.65,-3.2) {coverage map\\\tiny C13 parsed from \texttt{CLAUDE.md}};
+  \node[rm box] (aud) at (5.35,-3.2) {privacy audit\\\tiny 0 raw, 0 reversals};
+  \node[rm box] (pub) at (7.95,-3.2) {publishability\\\tiny secrets, personal data};
+  \node[rm box] (pyt) at (9.9,-3.2) {test suite\\\tiny \texttt{pytest}};
+  \foreach \cc in {gl,cov,aud,pub,pyt} \draw (\cc.south) -- (\cc.south |- 0,-4.15);
+  \draw (0,-4.15) -- (9.9,-4.15);
+  \draw (chk.west) -- ++(-0.4,0) |- (9.9,-4.15);
+  \node[rm store, minimum width=34mm] (res) at (5.1,-5.3) {\texttt{docs/results.md}\\\tiny generated blocks rewritten};
+  \draw[rm flow] (5.1,-4.15) -- (res);
+  \node[rm yes, anchor=south] at (11.35,-3.2) {yes};
+
+  \node[rm note, align=left, anchor=west, text width=60mm] at (7.6,-5.55)
+    {CI runs the same steps on every push: lint, tests, privacy audit, robustness matrix,
+     publishability, then \texttt{reproduce.py --skip-tests} and \texttt{git diff docs/}.};
+\end{tikzpicture}

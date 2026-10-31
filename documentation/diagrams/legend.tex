@@ -1,0 +1,32 @@
+% Shape and arrow legend used by every diagram in this directory.
+\begin{tikzpicture}[rm]
+  \node[rm stage] (a) at (0,0)    {stage};
+  \node[rm note, below=1pt] at (a.south) {pipeline stage};
+  \node[rm box]   (b) at (2.3,0)  {step};
+  \node[rm note, below=1pt] at (b.south) {processing step};
+  \node[rm sub]   (c) at (4.6,0)  {detail};
+  \node[rm note, below=1pt] at (c.south) {formula / rule detail};
+  \node[rm dec]   (d) at (6.9,0)  {test?};
+  \node[rm note, below=1pt] at (d.south) {decision};
+  \node[rm store] (e) at (9.2,0)  {store};
+  \node[rm note, below=1pt] at (e.south) {state, file, store};
+  \node[rm io]    (f) at (11.6,0) {in / out};
+  \node[rm note, below=1pt] at (f.south) {input / output};
+
+  \node[rm human] (g) at (0,-1.6)   {person};
+  \node[rm note, below=1pt] at (g.south) {human step};
+  \node[rm raw]   (h) at (2.3,-1.6) {raw / reject};
+  \node[rm note, below=1pt] at (h.south) {raw content, rejection};
+  \node[rm allow] (i) at (4.3,-1.6) {ALLOW};
+  \node[rm hold]  (j) at (5.95,-1.6) {HOLD};
+  \node[rm block] (k) at (7.6,-1.6) {BLOCK};
+  \node[rm note, below=1pt] at (j.south) {outcomes};
+  \node[font=\tiny] at (9.6,-1.45) {\rmC{contract\_*} \rmE{effect\_*} \rmF{flag}};
+  \node[rm note] at (9.6,-1.85) {signal chips};
+
+  \draw[rm flow]  (0,-2.9) -- ++(1.1,0) node[right, rm note] {control / data flow};
+  \draw[rm ctrl]  (3.0,-2.9) -- ++(1.1,0) node[right, rm note] {reads / configures};
+  \draw[rm back]  (6.0,-2.9) -- ++(1.1,0) node[right, rm note] {feedback, state update};
+  \draw[rm hflow] (9.2,-2.9) -- ++(1.1,0) node[right, rm note] {human action};
+  \draw[rm wall]  (11.9,-3.15) -- ++(0,0.5) node[right, rm note, pos=0.5, text=rmBlockLine] {privacy wall};
+\end{tikzpicture}

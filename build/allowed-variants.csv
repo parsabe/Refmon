@@ -1,9 +1,9 @@
 scenario,variant,questions_failed,questions_passed
+S07,combo-1,origin,contract|effect
 S19,timing=minutes,,origin|contract|effect
 S19,timing=beyond_window,origin,contract|effect
-S19,combo-1,origin,contract|effect
-S19,combo-4,origin,contract|effect
-S19,combo-6,origin,contract|effect
-S19,combo-11,origin,contract|effect
+S19,combo-5,origin,contract|effect
+S19,combo-10,origin,contract|effect
+S19,combo-11,,origin|contract|effect
 S19,combo-12,origin,contract|effect
-S25,combo-11,origin,contract|effect
+S27,timing=beyond_window,origin,contract|effect

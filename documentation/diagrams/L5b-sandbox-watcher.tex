@@ -1,0 +1,28 @@
+% Level 5b: the sandbox watcher of the live daemon (src/refmon/live.py scan_sandbox_once). Single column.
+\begin{tikzpicture}[rm]
+  \node[rm box] (th) at (0,0) {background watcher thread\\\tiny \texttt{scan\_sandbox\_once} every 0.4\,s};
+  % web root
+  \node[rm dec] (w1) at (-2.4,-1.5) {new or changed\\file in web root?\\\tiny (mtime, size)};
+  \node[rm raw, align=left] (w2) at (-2.4,-3.2)
+    {\texttt{request\_in} (\texttt{inbound\_request})\\+ \texttt{file\_write} by a \texttt{web\_worker}\\\tiny \texttt{executable}?, \texttt{new\_file}, \texttt{web\_root}};
+  % workspace
+  \node[rm dec] (s1) at (2.4,-1.5) {files changed\\in workspace?};
+  \node[rm raw, align=left] (s2) at (2.4,-3.2)
+    {one \texttt{file\_write} per changed\\file, one process root\\\tiny Poisson burst $\to$ \texttt{mass\_change}};
+  \node[rm stage, minimum width=50mm] (pp) at (0,-4.75) {\textbf{Pipeline} (Observe $\dots$ Gate)};
+  \node[rm dec] (bb) at (0,-6.2) {mode block and\\BLOCK or HOLD?};
+  \node[rm block, align=center] (q) at (-2.4,-7.65) {web root: quarantine\\\mdseries\tiny move to \texttt{quarantine/}, mode 0400,\\\tiny never deleted};
+  \node[rm block, align=center] (r) at (2.4,-7.65) {workspace: report\\\mdseries\tiny verdict + log line};
+  \node[rm term] (ok) at (4.6,-6.2) {log only};
+
+  \draw[rm flow] (th.west) -| (w1.north);
+  \draw[rm flow] (th.east) -| (s1.north);
+  \draw[rm flow] (w1) -- node[rm yes, right] {yes} (w2);
+  \draw[rm flow] (s1) -- node[rm yes, right] {yes} (s2);
+  \draw[rm flow] (w2.south) -- (w2.south |- pp.north);
+  \draw[rm flow] (s2.south) -- (s2.south |- pp.north);
+  \draw[rm flow] (pp) -- (bb);
+  \draw[rm flow] (bb) -- node[rm no, above] {no} (ok);
+  \draw[rm flow] (bb.west) -| node[rm yes, above, pos=0.25] {yes: web root} (q.north);
+  \draw[rm flow] (bb.south) -- ++(0,-0.25) -| node[rm yes, above, pos=0.3] {yes: workspace} (r.north);
+\end{tikzpicture}

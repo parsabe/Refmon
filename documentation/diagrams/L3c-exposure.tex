@@ -1,0 +1,49 @@
+% Level 3c: Exposure stage and virtual patching (src/refmon/exposure.py, C5, Phase 5). Wide figure.
+\begin{tikzpicture}[rm,
+    st/.style={rm term, minimum width=22mm, font=\scriptsize\sffamily\bfseries}]
+  \node[rm store, minimum width=30mm] (inv) at (-1.6,0) {inventory\\\tiny name, version, role, exposed,\\\tiny workaround flags, EOL};
+  \node[rm store, minimum width=30mm] (adv) at (1.9,0)  {advisories (local files)\\\tiny affected versions, severity,\\\tiny verified workaround};
+  \node[rm box] (each) at (0.15,-1.45) {for each component};
+  \node[rm dec] (e1) at (0.15,-2.7) {end of\\life?};
+  \node[rm dec] (e2) at (0.15,-4.15) {an advisory\\affects the\\version?};
+  \node[rm dec] (e3) at (0.15,-5.7) {workaround\\flag verified\\active?};
+  \node[rm dec] (e4) at (0.15,-7.2) {\texttt{exposed:}\\\texttt{true}?};
+
+  \node[st, draw=rmBlockLine, fill=rmBlock] (eol) at (4.2,-2.7) {end\_of\_life};
+  \node[st, draw=rmAllowLine, fill=rmAllow] (pat) at (-3.6,-4.15) {patched};
+  \node[st, draw=rmStageLine, fill=rmStage] (mit) at (-3.6,-5.7) {mitigated};
+  \node[st, draw=rmBlockLine, fill=rmBlock] (exp) at (4.2,-7.2) {exposed};
+  \node[st] (nr) at (0.15,-8.6) {not\_reachable};
+  \node[rm note, anchor=north] at (nr.south) {listed, never escalated};
+  \node[rm note, anchor=north] at (pat.south) {no escalation};
+  \node[rm note, anchor=north, align=center] at (mit.south) {no escalation;\\escalates if the flag disappears (S29)};
+
+  \draw[rm flow] (inv) |- (each.west);
+  \draw[rm flow] (adv) |- (each.east);
+  \draw[rm flow] (each) -- (e1);
+  \draw[rm flow] (e1) -- node[rm yes, above] {yes} (eol);
+  \draw[rm flow] (e1) -- node[rm no, right] {no} (e2);
+  \draw[rm flow] (e2) -- node[rm no, above] {no} (pat);
+  \draw[rm flow] (e2) -- node[rm yes, right] {yes} (e3);
+  \draw[rm flow] (e3) -- node[rm yes, above] {yes} (mit);
+  \draw[rm flow] (e3) -- node[rm no, right] {no} (e4);
+  \draw[rm flow] (e4) -- node[rm yes, above] {yes} (exp);
+  \draw[rm flow] (e4) -- node[rm no, right] {no} (nr);
+
+  % escalation
+  \node[rm block, align=left, font=\scriptsize\sffamily, minimum width=50mm] (esc) at (8.6,-4.95)
+    {\textbf{escalate the component's role only}\\[1pt]
+     \tiny $\bullet$ its contract rules switch to \texttt{escalate\_mode} (block)\\
+     \tiny $\bullet$ outbound network restricted to its contract's destinations\\
+     \tiny $\bullet$ a trusted destination class no longer excuses a connection\\
+     \tiny $\bullet$ verdicts name the reason: \texttt{component:advisory}};
+  \draw[rm bad] (eol.east) -| (esc.north);
+  \draw[rm bad] (exp.east) -| (esc.south);
+  \node[rm note, anchor=north] at (eol.south) {always exposed; kept until replaced (S28)};
+  \node[rm note, anchor=north] at (exp.south) {reverts when patched (S16)};
+  \node[rm stage, minimum width=40mm] (ovl) at (8.6,-1.0) {effective policy = signed policy + overlay\\\tiny only tightens; no policy file is changed};
+  \draw[rm flow] ($(esc.north)+(1.6,0)$) -- ($(ovl.south)+(1.6,0)$);
+  \node[rm note, text=rmStageLine, anchor=south, align=center] at (0.15,0.6)
+    {re-assessed whenever the inventory or the advisories change: the overlay reverts by itself\\
+     when a fixed version, a verified workaround or a replacement appears};
+\end{tikzpicture}

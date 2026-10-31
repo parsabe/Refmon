@@ -160,7 +160,10 @@ def _run(args: argparse.Namespace) -> int:
             pass_interval_s=max(0.0, args.interval_ms / 1000.0),
             run_external=args.with_external,
         )
-        report, _ = evaluate_rootkit_scan(cfg)
+        from .keys import new_device_key
+
+        # fresh random key per run: fingerprints correlate within this report and reverse nowhere
+        report, _ = evaluate_rootkit_scan(cfg, key=new_device_key())
         if args.as_json:
             print(json.dumps(report.to_dict(), indent=2))
         else:
