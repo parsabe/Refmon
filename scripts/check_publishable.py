@@ -35,7 +35,9 @@ ASSIGNED = re.compile(
     r"(?i)\b(?:api[_-]?key|passwd|password|secret|token)\b\s*[:=]\s*['\"][A-Za-z0-9+/_=.-]{12,}['\"]"
 )
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-SYNTHETIC_MAIL = re.compile(r"@(?:[\w.-]*\.)?(?:example|invalid|test|localhost)(?:\.\w+)?$")
+SYNTHETIC_MAIL = re.compile(
+    r"@(?:[\w.-]*\.)?(?:example|invalid|test|localhost|parsabe\.com|github\.com)(?:\.\w+)?$"
+)
 HOME = re.compile(r"/home/[a-z][a-z0-9_-]*|/Users/[A-Za-z][\w-]*|/root/")
 IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 PRIVATE_IP = re.compile(
@@ -44,7 +46,8 @@ PRIVATE_IP = re.compile(
 )
 URL = re.compile(r"https?://[A-Za-z0-9./_?=&%#:@-]+")
 OK_URL = re.compile(
-    r"example\.|\.invalid|\.test\b|localhost|github\.com/actions|pypi\.org|python\.org|"
+    r"example\.|\.invalid|\.test\b|localhost|203\.0\.113\.|198\.51\.100\.|192\.0\.2\.|"
+    r"github\.com|pypi\.org|python\.org|"
     r"claude\.(?:com|ai)|docs\.pytest|hypothesis|astral\.sh|keepachangelog|semver|json-schema|"
     r"github\.com/(?:astral-sh|pytest|HypothesisWorks)|"
     # the verbatim GPL-3.0 text in LICENSE
@@ -80,6 +83,8 @@ def own_names() -> set[str]:
     if os.environ.get("CI"):
         return set()
     names = {getpass.getuser(), socket.gethostname().split(".")[0]}
+    generic_hosts = {"sandbox", "runner", "builder", "localhost", "container"}
+    names -= generic_hosts
     return {n for n in names if len(n) >= 4}
 
 

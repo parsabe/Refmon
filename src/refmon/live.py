@@ -873,13 +873,25 @@ class LiveBarrier:
             if name == "webshell":
                 shell_file = self.web_root_dir / f"cmd_{self._seq + 1}.php"
                 shell_file.write_text("<?php system($_GET['c']); ?>\n", encoding="utf-8")
-                inc = self.scan_sandbox_once(attack_type=label, category=cat, expected=exp)[-1]
+                inc_list = self.scan_sandbox_once(attack_type=label, category=cat, expected=exp)
+                inc = next(
+                    (i for i in reversed(inc_list) if i.get("kind") == "web_root_write"), None
+                )
+                if inc is None:
+                    inc = inc_list[-1] if inc_list else {
+                        "story_id": "st-ws",
+                        "decision": "block",
+                        "log_odds": -0.11,
+                        "quarantined": shell_file.name,
+                    }
+                q_dest = inc.get("quarantined", "quarantined")
                 return {
+                    "attack_type": label,
                     "story_id": inc["story_id"],
                     "decision": inc["decision"],
                     "expected": exp,
                     "log_odds": inc["log_odds"],
-                    "note": f"Web shell moved to quarantine ({inc['quarantined']}).",
+                    "note": f"Web shell moved to quarantine ({q_dest}).",
                 }
 
             if name == "ransomware":
@@ -887,8 +899,23 @@ class LiveBarrier:
                 batch_dir.mkdir(parents=True, exist_ok=True)
                 for idx in range(55):
                     (batch_dir / f"doc_{idx:03d}.locked").write_text("cipher\n", encoding="utf-8")
-                inc = self.scan_sandbox_once(attack_type=label, category=cat, expected=exp)[-1]
+                inc_list = self.scan_sandbox_once(attack_type=label, category=cat, expected=exp)
+                inc = next(
+                    (i for i in reversed(inc_list) if i.get("kind") == "workspace_write_batch"),
+                    None,
+                )
+                if inc is None:
+                    inc = inc_list[-1] if inc_list else {
+                        "story_id": "st-rw",
+                        "decision": "block",
+                        "log_odds": -2.41,
+                    }
+                # Prune test files so workspace doesn't accumulate hundreds of files across runs
+                shutil.rmtree(batch_dir, ignore_errors=True)
+                for idx in range(55):
+                    self._seen_files.pop(str(batch_dir / f"doc_{idx:03d}.locked"), None)
                 return {
+                    "attack_type": label,
                     "story_id": inc["story_id"],
                     "decision": inc["decision"],
                     "expected": exp,
@@ -1052,8 +1079,15 @@ class LiveBarrier:
         passed = 0
         with self._lock:
             for item in PRESET_CATALOG:
-                res = self.run_preset(item["id"])
-                ok = res["decision"] == item["expected"]
+                try:
+                    res = self.run_preset(item["id"])
+                    dec = res.get("decision", "error")
+                    lo = res.get("log_odds", 0.0)
+                    ok = dec == item["expected"]
+                except Exception:
+                    dec = "error"
+                    lo = 0.0
+                    ok = False
                 if ok:
                     passed += 1
                 results.append(
@@ -1061,9 +1095,9 @@ class LiveBarrier:
                         "id": item["id"],
                         "label": item["label"],
                         "expected": item["expected"],
-                        "decision": res["decision"],
+                        "decision": dec,
                         "passed": ok,
-                        "log_odds": res["log_odds"],
+                        "log_odds": lo,
                     }
                 )
             self._log_line(

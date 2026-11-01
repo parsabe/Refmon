@@ -268,6 +268,14 @@ details summary {
     </div>
   </header>
 
+  <div id="token-banner" class="notice" style="display:none; background:#fff8c5; border:1px solid #d4a72c; color:#734f00; margin-bottom:14px; padding:10px 14px; border-radius:6px;">
+    <strong>API Token Required:</strong> The live barrier daemon requires authentication on shared cluster nodes.
+    <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <input id="token-input" placeholder="Paste API token from terminal or /tmp/refmon-live-*/api.token" style="flex:1; min-width:280px; font-family:var(--mono); padding:6px 9px; font-size:12px; border:1px solid #d4a72c; border-radius:4px;">
+      <button class="btn-sm" onclick="saveToken()" style="background:#0969da; color:#fff; border:none; padding:6px 14px; cursor:pointer; border-radius:4px; font-weight:600;">Save &amp; Authenticate</button>
+    </div>
+  </div>
+
   <div class="top-grid">
     <!-- Panel 1: Attack & Control Suite -->
     <div class="panel">
@@ -403,23 +411,46 @@ let currentFilter = 'all';
 let presetsRendered = false;
 
 // The API token comes from the URL fragment printed by `refmon serve` (a fragment is never sent
-// to a server or in a Referer); it is kept for this tab only and removed from the address bar.
-const TOKEN = (() => {
+// to a server or in a Referer); it is kept for this tab only and can also be entered via the UI banner.
+function getToken() {
   const fromHash = new URLSearchParams(location.hash.slice(1)).get('token');
+  if (fromHash) {
+    try { sessionStorage.setItem('refmonToken', fromHash); } catch (e) {}
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    return fromHash;
+  }
   try {
-    if (fromHash) { sessionStorage.setItem('refmonToken', fromHash); }
-    return fromHash || sessionStorage.getItem('refmonToken') || '';
-  } catch (e) { return fromHash || ''; }
-  finally { if (fromHash) history.replaceState(null, '', location.pathname); }
-})();
+    const s = sessionStorage.getItem('refmonToken');
+    if (s) return s;
+  } catch (e) {}
+  const inp = document.getElementById('token-input');
+  if (inp && inp.value.trim()) return inp.value.trim();
+  return '';
+}
+
+function saveToken() {
+  const inp = document.getElementById('token-input');
+  const val = (inp ? inp.value : '').trim();
+  if (val) {
+    try { sessionStorage.setItem('refmonToken', val); } catch (e) {}
+    const tb = document.getElementById('token-banner');
+    if (tb) tb.style.display = 'none';
+    refresh();
+  }
+}
 
 async function api(path, body) {
-  const headers = {'X-Refmon-Token': TOKEN};
+  const token = getToken();
+  const headers = {'X-Refmon-Token': token};
   const opts = body !== undefined
     ? {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify(body)}
     : {method: 'GET', headers};
   const r = await fetch(path, opts);
-  if (r.status === 401) { throw new Error('API token missing: open the URL printed by refmon serve'); }
+  if (r.status === 401) {
+    const tb = document.getElementById('token-banner');
+    if (tb) tb.style.display = 'block';
+    throw new Error('API token missing or invalid: paste token in banner above or open URL printed by refmon serve');
+  }
   return await r.json();
 }
 
@@ -454,36 +485,85 @@ function renderPresets(presets) {
 }
 
 async function runPreset(name) {
-  const res = await api('/api/preset', {name});
   const b = document.getElementById('suite-banner');
   b.style.display = 'block';
-  const match = res.expected ? (res.decision === res.expected ? 'PASS' : 'MISMATCH') : '';
-  b.innerHTML = `<strong>${esc(name)}</strong> &rarr; Verdict: <strong>${esc(res.decision).toUpperCase()}</strong> `
-    + (match ? `(Expected ${esc(res.expected).toUpperCase()}: <strong>${match}</strong>) ` : '')
-    + `| L = ${esc(res.log_odds)} nats. ${esc(res.note || '')}`;
+  b.className = 'notice';
+  b.style.background = '';
+  b.style.color = '';
+  b.textContent = `Running scenario: ${name}...`;
+  try {
+    const res = await api('/api/preset', {name});
+    if (res.error) {
+      b.style.background = 'var(--block-bg)';
+      b.style.color = 'var(--block-fg)';
+      b.innerHTML = `<strong>Error in ${esc(name)}:</strong> ${esc(res.error)}`;
+    } else {
+      const match = res.expected ? (res.decision === res.expected ? 'PASS' : 'MISMATCH') : '';
+      b.style.background = match === 'PASS' ? 'var(--allow-bg)' : (match === 'MISMATCH' ? 'var(--block-bg)' : '');
+      b.style.color = match === 'PASS' ? 'var(--allow-fg)' : (match === 'MISMATCH' ? 'var(--block-fg)' : '');
+      b.innerHTML = `<strong>${esc(res.attack_type || name)}</strong> &rarr; Verdict: <strong>${esc(res.decision).toUpperCase()}</strong> `
+        + (match ? `(Expected ${esc(res.expected).toUpperCase()}: <strong>${match}</strong>) ` : '')
+        + `| L = ${esc(res.log_odds)} nats. ${esc(res.note || '')}`;
+    }
+  } catch (err) {
+    b.style.background = 'var(--block-bg)';
+    b.style.color = 'var(--block-fg)';
+    b.innerHTML = `<strong>Error:</strong> ${esc(err.message || String(err))}`;
+  }
   await refresh();
 }
 
 async function runFullSuite() {
   const b = document.getElementById('suite-banner');
   b.style.display = 'block';
+  b.className = 'notice';
+  b.style.background = '';
+  b.style.color = '';
   b.textContent = 'Running all 16 attack & benign scenarios...';
-  const res = await api('/api/run_suite', {});
-  b.innerHTML = `<strong>Suite Complete:</strong> ${res.passed} / ${res.total} scenarios matched expected policy verdicts `
-    + `(${res.failed} mismatches). Inspect every row in the table below.`;
+  try {
+    const res = await api('/api/run_suite', {});
+    if (res.error) {
+      b.style.background = 'var(--block-bg)';
+      b.style.color = 'var(--block-fg)';
+      b.innerHTML = `<strong>Suite Error:</strong> ${esc(res.error)}`;
+    } else {
+      b.style.background = res.failed === 0 ? 'var(--allow-bg)' : 'var(--hold-bg)';
+      b.style.color = res.failed === 0 ? 'var(--allow-fg)' : 'var(--hold-fg)';
+      b.innerHTML = `<strong>Suite Complete:</strong> ${res.passed} / ${res.total} scenarios matched expected policy verdicts `
+        + `(${res.failed} mismatches). Inspect every row in the table below.`;
+    }
+  } catch (err) {
+    b.style.background = 'var(--block-bg)';
+    b.style.color = 'var(--block-fg)';
+    b.innerHTML = `<strong>Error:</strong> ${esc(err.message || String(err))}`;
+  }
   await refresh();
 }
 
 async function runGolden() {
   const scenario = document.getElementById('golden-id').value.trim();
-  const res = await api('/api/golden', {scenario});
   const b = document.getElementById('suite-banner');
   b.style.display = 'block';
-  if (res.error) {
-    b.textContent = res.error;
-  } else {
-    b.innerHTML = `<strong>${esc(res.scenario)}</strong> &rarr; ${esc(res.decision).toUpperCase()} `
-      + `(expected ${esc(res.expected).toUpperCase()}, check=${res.passed ? 'PASS' : 'MISMATCH'}, L=${res.log_odds} nats)`;
+  b.className = 'notice';
+  b.style.background = '';
+  b.style.color = '';
+  b.textContent = `Replaying golden scenario ${scenario}...`;
+  try {
+    const res = await api('/api/golden', {scenario});
+    if (res.error) {
+      b.style.background = 'var(--block-bg)';
+      b.style.color = 'var(--block-fg)';
+      b.textContent = res.error;
+    } else {
+      b.style.background = res.passed ? 'var(--allow-bg)' : 'var(--block-bg)';
+      b.style.color = res.passed ? 'var(--allow-fg)' : 'var(--block-fg)';
+      b.innerHTML = `<strong>${esc(res.scenario)}</strong> &rarr; ${esc(res.decision).toUpperCase()} `
+        + `(expected ${esc(res.expected).toUpperCase()}, check=${res.passed ? 'PASS' : 'MISMATCH'}, L=${res.log_odds} nats)`;
+    }
+  } catch (err) {
+    b.style.background = 'var(--block-bg)';
+    b.style.color = 'var(--block-fg)';
+    b.textContent = err.message || String(err);
   }
   await refresh();
 }
@@ -492,34 +572,57 @@ async function submitCommand() {
   const origin = document.getElementById('cmd-origin').value;
   const role = document.getElementById('cmd-role').value;
   const command = document.getElementById('cmd-text').value;
-  const res = await api('/api/guard', {command, origin, role, execute: true});
   const b = document.getElementById('cmd-banner');
   b.style.display = 'block';
-  b.innerHTML = `<strong>Verdict: ${esc(res.decision).toUpperCase()}</strong> `
-    + `(L = ${esc(res.log_odds)} nats, executed = ${esc(res.executed)})<br>`
-    + `${esc(res.explanation || '')}`
-    + (res.output ? `<br><span class="mono">stdout: ${esc(res.output)}</span>` : '');
+  b.textContent = 'Checking command...';
+  try {
+    const res = await api('/api/guard', {command, origin, role, execute: true});
+    if (res.error) {
+      b.innerHTML = `<strong>Error:</strong> ${esc(res.error)}`;
+    } else {
+      b.innerHTML = `<strong>Verdict: ${esc(res.decision).toUpperCase()}</strong> `
+        + `(L = ${esc(res.log_odds)} nats, executed = ${esc(res.executed)})<br>`
+        + `${esc(res.explanation || '')}`
+        + (res.output ? `<br><span class="mono">stdout: ${esc(res.output)}</span>` : '');
+    }
+  } catch (err) {
+    b.innerHTML = `<strong>Error:</strong> ${esc(err.message || String(err))}`;
+  }
   await refresh();
 }
 
 async function resolveHold(hold_id, platform, answer) {
-  await api('/api/hold', {hold_id, platform, answer});
+  try {
+    await api('/api/hold', {hold_id, platform, answer});
+  } catch (e) {
+    alert(e.message || String(e));
+  }
   await refresh();
 }
 
 async function setMode(mode) {
-  await api('/api/mode', {mode});
+  try {
+    await api('/api/mode', {mode});
+  } catch (e) {
+    alert(e.message || String(e));
+  }
   await refresh();
 }
 
 async function scanRootkit() {
-  await api('/api/rootkit', {});
+  try {
+    await api('/api/rootkit', {});
+  } catch (e) {
+    alert(e.message || String(e));
+  }
   await refresh();
 }
 
 async function refresh() {
   try {
     const st = await api('/api/state');
+    const tb = document.getElementById('token-banner');
+    if (tb) tb.style.display = 'none';
     renderPresets(st.presets);
 
     document.getElementById('hdr-paths').textContent =
