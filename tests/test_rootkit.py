@@ -156,6 +156,79 @@ def test_lone_anonymous_rwx_region_holds_without_false_block(tmp_path):
     assert report.pipeline_decision is Decision.HOLD
 
 
+def _rwx_process(proc: Path, pid: int, exe: str) -> None:
+    d = proc / str(pid)
+    d.mkdir()
+    (d / "environ").write_bytes(b"PATH=/usr/bin\x00")
+    (d / "status").write_text(f"Name:\tx\nTgid:\t{pid}\nPid:\t{pid}\nPPid:\t1\nTracerPid:\t0\n")
+    (d / "maps").write_text("7f200000-7f204000 rwxp 00000000 00:00 0 \n")
+    (d / "exe").symlink_to(exe)
+
+
+@pytest.mark.parametrize(
+    ("exe", "cls"),
+    [
+        ("/usr/bin/node", "node"),
+        ("/srv/u/.local/share/claude/versions/2.1.316", "claude_code"),
+        ("/usr/lib/jvm/java-21/bin/java", "jvm"),
+        ("/srv/u/.vscode-server/bin/abc/node", "node"),
+    ],
+)
+def test_jit_runtime_rwx_memory_is_a_note_not_evidence(tmp_path, exe, cls):
+    proc, sys_, etc = _make_clean_tree(tmp_path)
+    _rwx_process(proc, 400, exe)
+    report, _ = evaluate_rootkit_scan(_cfg(proc, sys_, etc))
+    assert report.findings == ()
+    assert report.calculus_decision is Decision.ALLOW
+    note = next(n for n in report.context_notes if "JIT runtime" in n)
+    assert f"{cls} x1" in note
+    assert exe not in json.dumps(report.to_dict())  # only the class name is reported
+
+
+@pytest.mark.parametrize(
+    "exe", ["/tmp/node", "/dev/shm/java", "/usr/bin/node (deleted)", "/memfd:node (deleted)"]
+)
+def test_a_jit_name_never_excuses_a_deleted_memfd_or_tmp_executable(tmp_path, exe):
+    proc, sys_, etc = _make_clean_tree(tmp_path)
+    _rwx_process(proc, 400, exe)
+    report, _ = evaluate_rootkit_scan(_cfg(proc, sys_, etc))
+    assert "anonymous_rwx_memory" in {f.kind for f in report.findings}
+    assert report.calculus_decision is not Decision.ALLOW
+
+
+def test_strict_jit_scores_jit_rwx_memory(tmp_path):
+    proc, sys_, etc = _make_clean_tree(tmp_path)
+    _rwx_process(proc, 400, "/usr/bin/node")
+    report, _ = evaluate_rootkit_scan(_cfg(proc, sys_, etc, strict_jit=True))
+    assert [f.kind for f in report.findings] == ["anonymous_rwx_memory"]
+    assert report.calculus_decision is Decision.HOLD
+
+
+def test_jit_process_keeps_its_other_checks(tmp_path):
+    proc, sys_, etc = _make_clean_tree(tmp_path)
+    _rwx_process(proc, 400, "/usr/bin/node")
+    (proc / "400" / "environ").write_bytes(b"LD_PRELOAD=/srv/u/hook.so\x00")
+    report, _ = evaluate_rootkit_scan(_cfg(proc, sys_, etc))
+    assert {f.kind for f in report.findings} == {"process_ld_preload"}
+    assert report.calculus_decision is Decision.BLOCK
+
+
+def test_cli_scan_rootkit_exit_code_names_the_decision(tmp_path, capsys):
+    from refmon.rootkit import RootkitScanReport
+
+    for decision, code in ((Decision.ALLOW, 0), (Decision.HOLD, 1), (Decision.BLOCK, 2)):
+        fake = RootkitScanReport(
+            scanned_at="t", passes=1, own_processes_inspected=0, kernel_modules_checked=0,
+            network_interfaces_checked=0, capabilities={}, context_notes=(), findings=(),
+            prior_log_odds=-6.9, log_odds=-6.9, hold_threshold=-4.9, block_threshold=-3.9,
+            calculus_decision=decision, pipeline_decision=decision, self_tamper=False,
+            verdicts_emitted=0, actions_emitted=0,
+        )  # fmt: skip
+        with patch("refmon.rootkit.evaluate_rootkit_scan", return_value=(fake, [])):
+            assert cli_main(["scan-rootkit", "--json"]) == code
+        capsys.readouterr()
+
+
 def test_hidden_kernel_module_caught_by_sysfs_vs_proc_modules_crossview(tmp_path):
     proc, sys_, etc = _make_clean_tree(tmp_path)
     # `diamorphine` unlinked itself from /proc/modules but its kobject stays in /sys/module
@@ -226,7 +299,7 @@ def test_hidden_pid_detected_when_omitted_from_proc_getdents(tmp_path):
 def test_cli_scan_rootkit_runs_read_only_on_live_host(capsys):
     code = cli_main(["scan-rootkit", "--json", "--passes", "2", "--interval-ms", "10"])
     payload = json.loads(capsys.readouterr().out)
-    assert code in (0, 1)
+    assert code in (0, 1, 2)
     assert payload["passes"] == 2
     assert payload["calculus_decision"] in {"allow", "hold", "block"}
     assert "proc_fs" in payload["capabilities"]

@@ -31,6 +31,7 @@ Privacy & safety:
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import hmac
 import math
@@ -60,6 +61,24 @@ TAINT_UNSIGNED_MODULE = 1 << 13  # bit 13 ('E'): unsigned module
 
 EPHEMERAL_DIRS = ("/tmp", "/var/tmp", "/dev/shm", "/run/shm")
 EXTERNAL_SCANNERS = ("unhide", "chkrootkit", "rkhunter")
+
+# Runtimes whose JIT compiler keeps anonymous rwx memory for the code it generates (V8,
+# JavaScriptCore, HotSpot, CLR, LuaJIT ...). Matched on the resolved executable path, as named
+# classes in the manner of the policy's `executables`; only the class name is reported. A match
+# turns anonymous rwx memory into a context note instead of evidence; it never excuses a deleted,
+# memfd or /tmp executable, and every other check of the process still runs. A same-user attacker
+# could copy a binary to a matching path (CLAUDE.md C12: an attacker in control of the account can
+# imitate it), so `strict_jit` scores these regions anyway.
+DEFAULT_JIT_RUNTIMES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("node", ("*/node", "*/nodejs", "*/node-*")),
+    ("bun_deno", ("*/bun", "*/deno")),
+    ("claude_code", ("*/.local/share/claude/versions/*", "*/claude")),
+    ("vscode", ("*/.vscode-server/*", "*/.cursor-server/*", "*/code", "*/code-server")),
+    ("jvm", ("*/java", "*/jvm/*/bin/java")),
+    ("browser", ("*/chrome", "*/chromium*", "*/firefox*")),
+    ("dotnet", ("*/dotnet",)),
+    ("other_jit", ("*/pypy*", "*/luajit*", "*/julia")),
+)
 
 # Log-likelihood weights in nats for the standalone rootkit summary calculus, aligned with C11:
 # high-certainty subversion crosses block; ambiguous single-signal anomalies (lone rwxp JIT or
@@ -102,6 +121,8 @@ class ScanConfig:
     run_external: bool = False
     external_timeout_s: float = 30.0
     device: str = "local-host"
+    jit_runtimes: tuple[tuple[str, tuple[str, ...]], ...] = DEFAULT_JIT_RUNTIMES
+    strict_jit: bool = False  # True: anonymous rwx memory of a JIT runtime is scored like any other
 
 
 @dataclass(frozen=True)
@@ -189,6 +210,19 @@ def _fp(key: bytes, text: str) -> str:
     return "hmac:" + hmac.new(key, norm.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def jit_class(exe_target: str, classes: tuple[tuple[str, tuple[str, ...]], ...]) -> str | None:
+    """The JIT runtime class of an executable, or None. A deleted, memfd or ephemeral executable
+    is never a JIT runtime, whatever its name."""
+    if not exe_target or exe_target.endswith(" (deleted)") or exe_target.startswith("/memfd:"):
+        return None
+    if _starts_ephemeral(exe_target):
+        return None
+    for name, patterns in classes:
+        if any(fnmatch.fnmatchcase(exe_target, pat) for pat in patterns):
+            return name
+    return None
+
+
 def _starts_ephemeral(path: str) -> bool:
     if path.startswith("/memfd:"):
         return True
@@ -209,6 +243,7 @@ class RootkitScanner:
         self.config = config or ScanConfig()
         self._key = key
         self._raw_subjects: dict[str, str] = {}
+        self._jit_seen: dict[str, int] = {}
 
     def _record_fp(self, raw_subject: str) -> str:
         digest = _fp(self._key, raw_subject)
@@ -218,6 +253,7 @@ class RootkitScanner:
     def scan(self) -> tuple[list[RootkitFinding], dict[str, str], list[str], tuple[int, int, int]]:
         """Run all enabled scanners and return (findings, capabilities, notes, counts)."""
         self._raw_subjects.clear()
+        self._jit_seen.clear()
         cfg = self.config
         uid = os.getuid() if cfg.target_uid is None else cfg.target_uid
         self_pid = os.getpid() if cfg.self_pid is None else cfg.self_pid
@@ -238,6 +274,13 @@ class RootkitScanner:
         # 1 & 2. Linker preload + fileless / hollowed / ptrace inspection on own-UID processes.
         f_pre, own_count = self._scan_preload_and_processes(uid, self_pid)
         findings.extend(f_pre)
+        if self._jit_seen:
+            n = sum(self._jit_seen.values())
+            classes = ", ".join(f"{k} x{v}" for k, v in sorted(self._jit_seen.items()))
+            notes.append(
+                f"anonymous rwx memory in {n} JIT runtime process{'es' if n > 1 else ''} "
+                f"({classes}): normal for JIT compilers, not scored (--strict-jit scores it)"
+            )
 
         # 3 & 4 & 5. Multi-pass cross-view snapshots (modules, PIDs, sockets) + kernel taint/net.
         mod_sets: list[set[str]] = []
@@ -538,7 +581,10 @@ class RootkitScanner:
                 )
             )
 
-        if anon_rwx > self.config.max_rwx_Normal_regions:
+        jit = None if self.config.strict_jit else jit_class(target, self.config.jit_runtimes)
+        if anon_rwx > self.config.max_rwx_Normal_regions and jit is not None:
+            self._jit_seen[jit] = self._jit_seen.get(jit, 0) + 1
+        elif anon_rwx > self.config.max_rwx_Normal_regions:
             out.append(
                 RootkitFinding(
                     scanner="fileless_memory",
