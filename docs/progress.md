@@ -310,3 +310,23 @@ scoring. `scan-rootkit` now exits 0 allow, 1 hold, 2 block (block was 1).
 
 Tests: `tests/test_health.py` (25) and 10 new cases in `tests/test_rootkit.py`. Not checked: the
 dashboard's new health panel in a browser (no browser or node on the cluster).
+
+## make reproduce repaired (2026-11-02)
+
+`scripts/reproduce.py` still replayed the tags `v1.0` to `v1.3` while the active seed was v2.0's,
+and wrote its tables over the committed v2.0 comparison. Worse, those tags do not hold those
+versions: after the squash they were put on unrelated commits (`v1.0` holds only the licence,
+`v1.1` and `v1.2` hold v1.4 work in progress, `v1.3` holds v1.7), and a tree without `src/` made the
+replay import the installed, current code without a warning.
+
+- New annotated tag `v1.7` on d77b756: the seed 171139148 variants replayed there equal
+  `docs/evaluation/v1.7-seed-171139148.jsonl` exactly; `v2.0` equals the v2.0 file and HEAD makes
+  the same decisions as v2.0.
+- The script takes its versions from `SEED_VERSIONS` (seed 171139148: v1.7, v2.0), refuses a tag
+  without `src/refmon` or one whose replay would import other code, and builds its tables for any
+  number of versions. `make reproduce`: both versions identical to the committed data; the
+  committed comparison file is unchanged byte for byte.
+- `docs/results.md` now shows v1.7 and v2.0 on the active seed; sections 7 (G1 to G5), 8 (F1 to
+  F12), 10 and 11 brought up to date. The v1.0 to v1.3 evaluation stays in v1.3-evaluation.md.
+- Not changed: the misleading tags `v1.0` to `v1.3` (local only; not on the remote). Deleting them
+  is the owner's decision.

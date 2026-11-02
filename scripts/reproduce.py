@@ -2,19 +2,26 @@
 
     python scripts/reproduce.py            # what `make reproduce` runs
 
-It (1) generates the variants of the active seed once, (2) extracts the tags v1.0 to v1.3 from git
-and replays that one file in each, (3) compares the four, (4) checks the result against the
-committed per-variant data in docs/evaluation/, (5) runs the golden catalog in each version, builds
-the coverage map, runs the privacy audit, the publishability check and the test suite, and
-(6) writes the generated blocks of docs/results.md and the full comparison to docs/evaluation/.
+It (1) generates the variants of the active seed once, (2) extracts from git the tagged versions
+that seed was recorded to evaluate (SEED_VERSIONS, from docs/variant-seeds.md) and replays that one
+file in each, (3) compares them, (4) checks the result against the committed per-variant data in
+docs/evaluation/, (5) runs the golden catalog in each version, builds the coverage map, runs the
+privacy audit, the publishability check and the test suite, and (6) writes the generated blocks of
+docs/results.md and the full comparison to docs/evaluation/.
 
-Nothing is fetched from the network. The tags must exist (`git fetch --tags` in a clone).
+Nothing is fetched from the network. The tags must exist (`git fetch --tags` in a clone), and each
+must hold the code of its version: a tree without `src/refmon` is refused, and every replay checks
+that it imports the package of its own tree (not the installed one).
+
+The versions of retired seeds are not regenerated: v1.0 to v1.3 were lost when the history was
+squashed. Their per-variant data stays in docs/evaluation/ as a record.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -33,7 +40,27 @@ from refmon import variants  # noqa: E402
 from refmon.coverage import ADAPTIVE, parse_coverage_map  # noqa: E402
 from refmon.evalstats import mcnemar_exact, wilson_interval  # noqa: E402
 
-TAGS = ["v1.0", "v1.1", "v1.2", "v1.3"]
+# The versions each seed was recorded to evaluate (docs/variant-seeds.md). A new active seed must
+# be added here before `make reproduce` runs on it.
+SEED_VERSIONS: dict[int, tuple[str, ...]] = {171139148: ("v1.7", "v2.0")}
+NOTES = {
+    "v1.7": "A60 to A64: lineage-aware trust, incidents end, bounded state, producers act, "
+    "every live label handed over",
+    "v2.0": "A65, A66: trust as lineage (F10), relay containment",
+}
+
+
+def versions_for(seed: int) -> tuple[str, ...]:
+    if seed not in SEED_VERSIONS:
+        raise SystemExit(
+            f"seed {seed} has no recorded versions: add it to SEED_VERSIONS in "
+            "scripts/reproduce.py (see docs/variant-seeds.md)"
+        )
+    return SEED_VERSIONS[seed]
+
+
+TAGS = list(versions_for(variants.SEED))
+FIRST, LAST = TAGS[0], TAGS[-1]
 PY = sys.executable
 RESULTS = ROOT / "docs" / "results.md"
 
@@ -52,6 +79,25 @@ def extract(tag: str, dest: Path) -> None:
         ["git", "-C", str(ROOT), "archive", tag], check=True, capture_output=True
     ).stdout
     subprocess.run(["tar", "-x", "-C", str(dest)], input=archive, check=True)
+    check_tree(tag, dest)
+
+
+def check_tree(tag: str, tree: Path) -> None:
+    """A tag without the package would silently replay the installed (current) code instead."""
+    if not (tree / "src" / "refmon" / "__init__.py").is_file():
+        raise SystemExit(f"tag {tag} holds no src/refmon: it is not a Refmon version")
+    probe = [PY, "-c", "import refmon; print(refmon.__file__)"]
+    done = subprocess.run(
+        probe,
+        cwd=ROOT,
+        env={**os.environ, "PYTHONPATH": str(tree / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    where = Path(done.stdout.strip() or "?").resolve()
+    if done.returncode != 0 or not where.is_relative_to(tree.resolve()):
+        raise SystemExit(f"the replay of {tag} would import {where}, not the code of its tag")
 
 
 def replay_all(tmp: Path, seed: int) -> tuple[dict[str, Path], str]:
@@ -89,28 +135,28 @@ def golden_table(tmp: Path) -> tuple[str, dict[str, dict]]:
         command = [PY, "scripts/golden_decisions.py", "--golden", str(tree / "tests" / "golden")]
         text = sh(command, {"PYTHONPATH": str(tree / "src")})
         per[tag] = json.loads(text)
-    ids = sorted(per[TAGS[0]])
+    ids = sorted(per[FIRST])
     lines = [
         "| scenario | kind | expected | " + " | ".join(TAGS) + " |",
-        "|---|---|---|" + "---|" * 4,
+        "|---|---|---|" + "---|" * len(TAGS),
     ]
     for sid in ids:
-        exp = per["v1.3"][sid]["expected"]
+        exp = per[LAST][sid]["expected"]
         cells = []
         for tag in TAGS:
             got = per[tag][sid]["decision"]
             cells.append(got if got == exp else f"**{got}**")
-        lines.append(f"| {sid} | {per['v1.3'][sid]['kind']} | {exp} | " + " | ".join(cells) + " |")
+        lines.append(f"| {sid} | {per[LAST][sid]['kind']} | {exp} | " + " | ".join(cells) + " |")
     total = len(ids)
-    summary = ["", "| | " + " | ".join(TAGS) + " |", "|---|" + "---:|" * 4]
-    ok = [sum(per[t][s]["decision"] == per["v1.3"][s]["expected"] for s in ids) for t in TAGS]
+    summary = ["", "| | " + " | ".join(TAGS) + " |", "|---|" + "---:|" * len(TAGS)]
+    ok = [sum(per[t][s]["decision"] == per[LAST][s]["expected"] for s in ids) for t in TAGS]
     summary.append(
         f"| scenarios reaching the expected `decision` (of {total}) | "
         + " | ".join(map(str, ok))
         + " |"
     )
-    same = [sum(per[t][s]["decision"] == per["v1.0"][s]["decision"] for s in ids) for t in TAGS]
-    summary.append("| same `decision` as v1.0 | " + " | ".join(map(str, same)) + " |")
+    same = [sum(per[t][s]["decision"] == per[FIRST][s]["decision"] for s in ids) for t in TAGS]
+    summary.append(f"| same `decision` as {FIRST} | " + " | ".join(map(str, same)) + " |")
     return "\n".join(lines + summary), per
 
 
@@ -118,7 +164,7 @@ def coverage_table(per: dict[str, dict]) -> str:
     pytest = [PY, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/test_phase5_exposure.py"]
     ran = sh(pytest, check=False)
     adaptive_ok = "passed" in ran and "failed" not in ran
-    cur = per["v1.3"]
+    cur = per[LAST]
 
     def mark(sid: str) -> str:
         if sid in ADAPTIVE:
@@ -133,7 +179,7 @@ def coverage_table(per: dict[str, dict]) -> str:
         lines.append(f"| {fam.name} | {mal} | {ben} |")
     lines += [
         "",
-        "✓ the scenario reaches its expected `decision` in v1.3 (S16, S28 and S29 are "
+        f"✓ the scenario reaches its expected `decision` in {LAST} (S16, S28 and S29 are "
         "policy-over-time tests in tests/test_phase5_exposure.py).",
     ]
     return "\n".join(lines)
@@ -164,7 +210,10 @@ def stats_table(runs: dict[str, dict]) -> str:
         ("malicious variants contained (block or effective hold)", mal, contained),
         ("neutral benign variants blocked (false block rate)", neutral, blocked),
     ]
-    lines = ["| rate (Wilson 95 % interval) | " + " | ".join(TAGS) + " |", "|---|" + "---:|" * 4]
+    lines = [
+        "| rate (Wilson 95 % interval) | " + " | ".join(TAGS) + " |",
+        "|---|" + "---:|" * len(TAGS),
+    ]
     for name, keyset, fn in rows:
         cells = [cell(sum(fn(t, k) for k in keyset), len(keyset)) for t in TAGS]
         lines.append(f"| {name} | " + " | ".join(cells) + " |")
@@ -176,7 +225,7 @@ def stats_table(runs: dict[str, dict]) -> str:
         "| comparison | metric | only first | only second | p |",
         "|---|---|---:|---:|---:|",
     ]
-    for a, b in (("v1.0", "v1.3"), ("v1.0", "v1.1"), ("v1.2", "v1.3")):
+    for a, b in comparison_pairs(TAGS):
         for name, fn in (("caught", caught), ("contained", contained), ("blocked", blocked)):
             x = sum(fn(a, k) and not fn(b, k) for k in mal)
             y = sum(fn(b, k) and not fn(a, k) for k in mal)
@@ -184,17 +233,18 @@ def stats_table(runs: dict[str, dict]) -> str:
     return "\n".join(lines)
 
 
+def comparison_pairs(tags: list[str]) -> list[tuple[str, str]]:
+    """First against last, then each version against the one before it (no pair twice)."""
+    pairs = [(tags[0], tags[-1])] if len(tags) > 1 else []
+    pairs += [(a, b) for a, b in itertools.pairwise(tags) if (a, b) not in pairs]
+    return pairs
+
+
 def versions_table() -> str:
     lines = ["| tag | commit | |", "|---|---|---|"]
-    notes = {
-        "v1.0": "the frozen state after Phase 7",
-        "v1.1": "F1 to F4: external command, hold fallback, role-scoped trust, hour window",
-        "v1.2": "F5 to F7: channel roles out of the fallback, no-label blocks act, seeded numbers",
-        "v1.3": "F8 and F9: monotone calculus, benign variants",
-    }
     for tag in TAGS:
-        commit = sh(["git", "-C", str(ROOT), "rev-list", "-n1", tag]).strip()[:7]
-        lines.append(f"| {tag} | {commit} | {notes[tag]} |")
+        commit = sh(["git", "-C", str(ROOT), "rev-list", "-n1", f"refs/tags/{tag}"]).strip()[:7]
+        lines.append(f"| {tag} | {commit} | {NOTES.get(tag, '')} |")
     return "\n".join(lines)
 
 

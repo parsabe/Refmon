@@ -292,9 +292,11 @@ Over 1,900 tests: unit tests per rule, contract, effect and override; Hypothesis
 (labels never lost, no raw content after Observe, Contain never touches an unlabeled object, ...);
 replay of the 46 golden scenarios; the privacy audit; rootkit, live-barrier, CLI and attack-lab
 tests. One test is an expected failure (`xfail`): a documented limit of the S19 stand-in.
-`make reproduce` regenerates the variant matrices from the pre-registered seeds, replays them in
-every tagged version, compares them with Wilson intervals and exact McNemar tests, and refreshes
-[docs/results.md](docs/results.md). `scripts/check_publishable.py` checks that no secret, home path
+`make reproduce` (several minutes) generates the variants of the active pre-registered seed,
+replays them in the tagged versions that seed was recorded for (`v1.7` and `v2.0`), checks that the
+result equals the committed per-variant data in `docs/evaluation/`, compares the versions with
+Wilson intervals and exact McNemar tests, and refreshes the generated tables of
+[docs/results.md](docs/results.md). It refuses a tag that does not hold its version's code. `scripts/check_publishable.py` checks that no secret, home path
 or personal data is in the tree or the history.
 
 ## Results
@@ -429,11 +431,14 @@ make -C documentation overleaf-zip   # refmon-paper-overleaf.zip
 
 ## Versions
 
-`v1.0` is the frozen baseline after Phase 7. Every later version (`v1.1` to `v1.7`, `v2.0`; git
-tags `v1.0` to `v1.3` and `v2.0`) changes structural rules only in response to a documented finding,
+`v1.0` is the frozen baseline after Phase 7. Every later version (`v1.1` to `v1.7`, `v2.0`) changes
+structural rules only in response to a documented finding,
 and is evaluated on a fresh variant seed recorded before the change
 ([docs/variant-seeds.md](docs/variant-seeds.md));
-the weights have not changed since `v1.0`. `v2.0` scopes trust to process lineage (A65) and lets a
+the weights have not changed since `v1.0`. The git tags `v1.7` and `v2.0` hold the code of those
+versions (checked by exact replay of the committed results). The code of `v1.0` to `v1.6` was lost
+when the history was squashed; their per-variant results stay in `docs/evaluation/` as a record.
+`v2.0` scopes trust to process lineage (A65) and lets a
 channel role hand containment to the program it started (A66); it removed the last neutral false
 blocks (2/158 → 0/158) without changing any malicious outcome. The attack lab, its analysis and
 the Phase 8 plan are on top of `v2.0`.

@@ -43,6 +43,40 @@ def test_the_tags_the_reproduction_needs_exist():
     assert set(rp.TAGS) <= set(tags)
 
 
+def test_the_active_seed_names_the_versions_it_evaluates():
+    from refmon import variants
+
+    assert list(rp.SEED_VERSIONS[variants.SEED]) == rp.TAGS
+    assert all(tag in rp.NOTES for tag in rp.TAGS)
+    with pytest.raises(SystemExit, match="no recorded versions"):
+        rp.versions_for(1)
+
+
+def test_a_tree_without_the_package_is_refused(tmp_path):
+    """Before: the replay of such a tag silently imported the installed, current code."""
+    (tmp_path / "LICENSE").write_text("x")
+    with pytest.raises(SystemExit, match="holds no src/refmon"):
+        rp.check_tree("v-empty", tmp_path)
+
+
+def test_a_tree_that_would_import_other_code_is_refused(tmp_path):
+    pkg = tmp_path / "src" / "refmon"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("raise ImportError('broken on purpose')\n")
+    with pytest.raises(SystemExit, match="would import"):
+        rp.check_tree("v-broken", tmp_path)
+
+
+def test_every_tag_the_reproduction_uses_holds_its_code(tmp_path):
+    for tag in rp.TAGS:
+        rp.extract(tag, tmp_path / tag)  # raises when the tag holds no Refmon
+
+
+def test_comparison_pairs():
+    assert rp.comparison_pairs(["a", "b"]) == [("a", "b")]
+    assert rp.comparison_pairs(["a", "b", "c"]) == [("a", "c"), ("a", "b"), ("b", "c")]
+
+
 def findings(line):
     return cp.line_findings(line, {"labhost"})
 
