@@ -26,9 +26,10 @@ evaluation before it, and is measured on a seed recorded before the change
 The tables below are those of the active seed, which was recorded to evaluate v1.7 and v2.0. The tags
 `v1.7` and `v2.0` hold the code of those versions: `make reproduce` replays the variants in each and
 checks the result against the committed per-variant data in [evaluation/](evaluation/), and it was
-identical. The code of v1.0 to v1.6 was lost when the history was squashed (the tags `v1.0` to
-`v1.3` in this clone do not point at those versions, and the reproduction refuses them); their
-evaluations on retired seeds are kept as a record in section 11.
+identical. The code of v1.0 to v1.6 was lost when the history was squashed, so those versions
+have no tags (tags `v1.0` to `v1.3` that had been put on unrelated commits were deleted on
+2026-11-02, and the reproduction refuses a tag without its version's code); their evaluations on
+retired seeds are kept as a record in section 11.
 
 ## 2. Generated variants, v1.7 and v2.0 (active seed)
 
@@ -375,9 +376,8 @@ regenerated; `make publishable` runs it alone). The content is clean. These are 
    masked). Publishing the history publishes them. Options: publish as is; rewrite with
    `git filter-repo --mailmap`; or publish a squashed export of the final tree.
 2. **Licence.** GPL-3.0 (`LICENSE`).
-3. **Which tags to publish.** `v1.7` and `v2.0` hold their versions and are what `make reproduce`
-   needs. The tags `v1.0` to `v1.3` in this clone point at commits that do not hold those versions
-   (one holds only the licence); publishing them would mislead.
+3. **Which tags to publish.** `v1.7` and `v2.0`: they hold their versions and are what
+   `make reproduce` needs. They are the only tags.
 4. **CLAUDE.md.** It is the specification, written as a prompt file for the coding agent, and the
    tests read the weights and the coverage map from it. Keep it, or rename it and update the places
    that read it (`tests/test_phase1_golden.py`, `tests/test_phase4b_golden.py`,

@@ -328,5 +328,6 @@ replay import the installed, current code without a warning.
   committed comparison file is unchanged byte for byte.
 - `docs/results.md` now shows v1.7 and v2.0 on the active seed; sections 7 (G1 to G5), 8 (F1 to
   F12), 10 and 11 brought up to date. The v1.0 to v1.3 evaluation stays in v1.3-evaluation.md.
-- Not changed: the misleading tags `v1.0` to `v1.3` (local only; not on the remote). Deleting them
-  is the owner's decision.
+- The misleading tags `v1.0` to `v1.3` (local only, never on the remote) were deleted on the
+  owner's decision; they pointed at 03635ef, d5d546f, 2c85294 and d77b756. The only tags are now
+  `v1.7` and `v2.0`.

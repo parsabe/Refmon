@@ -9,7 +9,7 @@
 # stores one. It uses only what git on this machine already has (an SSH key loaded in ssh-agent, or a
 # credential helper). If git would have to ask for credentials, the push fails with a message instead
 # of prompting. It never force-pushes, never pushes another branch (`attack-lab`, the branch `v2.0`),
-# and never pushes the tags v1.0 to v1.3, which do not hold those versions (docs/progress.md).
+# and never pushes any tag but v1.7 and v2.0, the tags that hold their versions (docs/progress.md).
 set -euo pipefail
 
 REMOTE="${REMOTE:-origin}"
@@ -109,7 +109,6 @@ if [ "$PUSH_TAGS" -eq 1 ]; then
 			fail "tag $tag points at ${remote_commit:0:7} on $REMOTE but ${local_commit:0:7} here; not overwriting"
 		fi
 	done
-	echo "  (v1.0 to v1.3 are never pushed: they do not hold those versions)"
 fi
 
 if [ "$ahead" -eq 0 ] && [ "${#tag_refs[@]}" -eq 0 ]; then
