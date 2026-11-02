@@ -3,11 +3,11 @@
   \node[rm store, minimum width=28mm] (seed) at (0,0) {\texttt{variant-seeds.md}\\\tiny seed recorded \emph{before}\\\tiny any rule change};
   \node[rm box] (gen) at (3.35,0) {\texttt{generate\_variants.py}\\\tiny 46 golden files $\times$ 6 dimensions\\\tiny + seeded combinations\\\tiny + benign variants (A56)};
   \node[rm store, minimum width=24mm] (vf) at (6.55,0) {\texttt{variants.jsonl}\\\tiny generated once};
-  \node[ver] (v0) at (9.35, 1.05) {\texttt{v1.0} (frozen)};
-  \node[ver] (v1) at (9.35, 0.35) {\texttt{v1.1}};
-  \node[ver] (v2) at (9.35,-0.35) {\texttt{v1.2}};
-  \node[ver] (v3) at (9.35,-1.05) {\texttt{v1.3}};
-  \node[rm note, anchor=south] at (9.35,1.4) {git tags extracted, the \emph{same} file\\replayed in each (\texttt{dump\_matrix.py})};
+  \node[rm dec, minimum width=22mm] (tg) at (9.35, 1.35) {tag holds\\\texttt{src/refmon}?};
+  \node[ver] (v1) at (9.35, 0.35) {\texttt{v1.7}};
+  \node[ver] (v2) at (9.35,-0.35) {\texttt{v2.0}};
+  \node[rm note, anchor=north] at (9.35,-0.75) {versions of the active seed\\(\texttt{SEED\_VERSIONS}), the \emph{same}\\file replayed in each};
+  \node[rm raw] (nt) at (9.35, 2.75) {refused: not that version};
   \node[rm box] (cmp) at (12.6,0) {\texttt{compare\_versions.py}\\\tiny block / effective hold /\\\tiny hold pauses nothing / allow;\\\tiny benign: neutral vs.\ labelled};
   \node[rm box] (st) at (12.6,-1.65) {\texttt{evalstats}\\\tiny Wilson 95\,\% intervals,\\\tiny exact McNemar test};
   \node[rm dec] (chk) at (12.6,-3.2) {equal to committed\\\texttt{docs/evaluation}?};
@@ -15,10 +15,12 @@
 
   \draw[rm flow] (seed) -- (gen);
   \draw[rm flow] (gen) -- (vf);
-  \foreach \vv in {v0,v1,v2,v3} {
+  \draw[rm flow] (tg) -- node[rm no, right] {no} (nt);
+  \foreach \vv in {v1,v2} {
     \draw[rm flow] (vf.east) -- (\vv.west);
     \draw[rm flow] (\vv.east) -- (cmp.west);
   }
+  \draw[rm flow] (tg.south) -- node[rm yes, right] {yes} (v1.north);
   \draw[rm flow] (cmp) -- (st);
   \draw[rm flow] (st) -- (chk);
   \draw[rm flow] (chk) -- node[rm no, right] {no} (mm);

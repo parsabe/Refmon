@@ -409,6 +409,7 @@ The two-column LaTeX paper (method, mathematics, algorithms, experiments includi
 discussion, deployment status, and the proofs in the appendices) is in [documentation/](documentation/):
 
 ```bash
+make -C documentation figures        # the evaluation charts, from docs/evaluation/ (pip install -e ".[paper]")
 make -C documentation pdf            # documentation/main.pdf (pdflatex, twice)
 make -C documentation diagrams       # the level-by-level diagram book
 make -C documentation overleaf-zip   # refmon-paper-overleaf.zip

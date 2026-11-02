@@ -147,8 +147,9 @@ audit log, and the adversarial privacy audit over all outputs.}
 % ============================================================================
 \clearpage
 \section{Level 4: evaluation}
-\rmdiagram{L4a-reproduce}{\texttt{make reproduce}: one seeded variant file replayed in every tagged
-version, compared, checked against the committed per-variant data, and written into
+\rmdiagram{L4a-reproduce}{\texttt{make reproduce}: one seeded variant file replayed in each tagged
+version the active seed was recorded for (\texttt{v1.7}, \texttt{v2.0}; a tag that does not hold its
+version's code is refused), compared, checked against the committed per-variant data, and written into
 \texttt{docs/results.md} together with the golden, coverage, audit, publishability and test results.}
 
 \rmdiagram{L4b-phases-versions}{Build phases (top) and the version history (bottom): each version answers

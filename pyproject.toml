@@ -15,6 +15,7 @@ refmon = "refmon.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.5"]
+paper = ["matplotlib>=3.8"]  # documentation/make_figures.py: the charts of the paper
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/refmon"]
