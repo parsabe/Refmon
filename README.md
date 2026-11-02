@@ -100,6 +100,36 @@ You can also test live file containment by dropping a dummy script (for example 
 the watched `<workdir>/sandbox/web_root/` directory: within `< 500 ms` the watcher quarantines it
 into `<workdir>/quarantine/` with `0400` permissions and logs the story verdict.
 
+## Attack lab (interactive CLI)
+
+```bash
+make lab                                  # or: .venv/bin/python -m refmon.cli lab
+.venv/bin/python -m refmon.cli lab --help # step-by-step test guide (also: type 'guide' in the lab)
+.venv/bin/python -m refmon.cli lab --list # the 35 templates
+.venv/bin/python -m refmon.cli lab --table          # table of all attacks
+.venv/bin/python -m refmon.cli lab --test-all       # run all, print the analysis, save logs to attack-lab/runs/
+.venv/bin/python -m refmon.cli lab --analyze        # analysis of the newest saved run
+.venv/bin/python -m refmon.cli lab --compare attack-lab/runs/run-*   # saved runs side by side
+.venv/bin/python -m refmon.cli lab --run clickfix 13 web_shell
+```
+
+A menu of attack templates (ClickFix, obfuscated and base64 one-liners, AI prompt injection,
+reverse shells, SSH tunnels, LD_PRELOAD, SUID, credential and key theft, canary, exfiltration,
+persistence via `.bashrc`/git hooks/cron, killing Refmon, log wiping, ransomware, wipers, web RCE,
+typosquatting, a web-shell drop and a 60-file ransomware burst), plus benign controls and one
+known limit. Every command goes through the live pipeline **before** it runs; only what Refmon
+allows is executed, inside the sandbox (`cwd` = `<workdir>/sandbox/workspace`, `HOME` = a fake
+home with fake keys, 5 s timeout). A hold asks you whether to release it. Type `$ <command>` to
+send your own command through Refmon, `o web` to mark it as pasted from a web page, `m observe`
+to watch Refmon only log, `s` for the score. Every template is a harmless stand-in (`.invalid`
+hosts, fake credentials); the ones that would touch the real system (`sudo`, `crontab`,
+`systemctl`, `pkill`, `docker`, `rm -rf ~`, `tar ~`) are judged but never executed. State lives
+in `attack-lab/` inside the repository (gitignored; `--workdir` for another place): the signed
+policy and keys, the sandbox, `quarantine/`, Refmon's own logs in `logs/` (`barrier.log`,
+`verdicts.jsonl`, `events.jsonl`) and one folder per saved run in `runs/` (`report.md` with the
+analysis, `analysis.txt`, `results.csv`, `results.jsonl`, `summary.json`, `console.log`).
+All attacks and a reference run are tabled in [docs/attack-lab.md](docs/attack-lab.md).
+
 ## Run the six-engine rootkit scanner
 
 ```bash

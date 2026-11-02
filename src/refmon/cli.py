@@ -11,6 +11,7 @@
     refmon scan-rootkit [--json]               run read-only multi-engine rootkit scanners
     refmon serve [--port PORT] [--workdir DIR] start live background barrier & web dashboard
     refmon guard [OPTS] -- COMMAND...          intercept and enforce policy on a command
+    refmon lab [--list] [--run N ...]          interactive attack lab: templates judged, then run
 
 Nothing here runs unattended: a person holds the key and names themselves as approver.
 """
@@ -92,6 +93,69 @@ def main(argv: list[str] | None = None) -> int:
     grd.add_argument("--no-exec", action="store_true")
     grd.add_argument("--json", action="store_true", dest="as_json")
     grd.add_argument("cmd_parts", nargs=argparse.REMAINDER)
+    from .attacklab import GUIDE
+
+    lab = sub.add_parser(
+        "lab",
+        help="interactive attack lab: pick an attack, Refmon judges it before it runs",
+        description="Interactive attack lab: attack templates go through the Refmon pipeline "
+        "before they may run. Without options it opens the menu.",
+        epilog=GUIDE,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    lab.add_argument(
+        "--workdir",
+        default=None,
+        help="lab folder: policy, keys, sandbox, logs/, runs/ (default <Refmon>/attack-lab)",
+    )
+    lab.add_argument("--list", action="store_true", help="print all templates and exit")
+    lab.add_argument(
+        "--run",
+        nargs="+",
+        default=None,
+        metavar="TEMPLATE",
+        help="run templates without the menu: numbers, ids, ranges, all/attacks/benign/limits",
+    )
+    lab.add_argument(
+        "--mode",
+        choices=("block", "warn", "observe"),
+        default=None,
+        help="set the signed policy mode first (block enforces; warn/observe only log)",
+    )
+    lab.add_argument("--no-color", action="store_true", help="plain output")
+    lab.add_argument("--table", action="store_true", help="print the table of all attacks and exit")
+    lab.add_argument(
+        "--test-all",
+        action="store_true",
+        help="run ALL templates and save every result (jsonl, csv, md, console.log)",
+    )
+    lab.add_argument("--save", action="store_true", help="with --run: also save the results")
+    lab.add_argument(
+        "--report-dir",
+        default=None,
+        help="where saved runs go (default <Refmon>/attack-lab/runs; each run gets run-<time>/)",
+    )
+    lab.add_argument(
+        "--analyze",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="RUN_DIR",
+        help="print the analysis of a saved run (default: the newest) and exit",
+    )
+    lab.add_argument(
+        "--compare",
+        nargs="+",
+        default=None,
+        metavar="RUN_DIR",
+        help="compare saved runs side by side (decision per attack per run) and exit",
+    )
+    lab.add_argument(
+        "--record-own-commands",
+        action="store_true",
+        help="store the text and output of your own $ commands in saved reports "
+        "(default: an hmac fingerprint only)",
+    )
 
     args = parser.parse_args(argv)
     try:
@@ -173,6 +237,10 @@ def _run(args: argparse.Namespace) -> int:
         from .live import serve_forever
 
         return serve_forever(host=args.host, port=args.port, workdir=args.workdir)
+    elif args.command == "lab":
+        from .attacklab import main as lab_main
+
+        return lab_main(args)
     elif args.command == "guard":
         import json
         import shlex
