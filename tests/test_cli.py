@@ -36,3 +36,20 @@ def test_an_edited_policy_does_not_verify(tmp_path, capsys):
     main(["sign", str(policy), str(key)])
     policy.write_text(policy.read_text().replace("mode: observe", "mode: block"))
     assert main(["verify", str(policy), public]) == 1
+
+
+def test_cli_gui_attaches_to_running_daemon(tmp_path, capsys):
+    import threading
+
+    from refmon.live import LiveBarrier, make_http_server
+
+    barrier = LiveBarrier(workdir=tmp_path)
+    server = make_http_server(barrier, host="127.0.0.1", port=0)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    res = main(["gui", "--port", str(port), "--workdir", str(tmp_path), "--no-browser"])
+    assert res == 0
+    out = capsys.readouterr().out
+    assert "active daemon detected" in out

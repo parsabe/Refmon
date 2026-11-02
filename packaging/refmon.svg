@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0969da"/>
+      <stop offset="100%" stop-color="#053b7a"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2da44e"/>
+      <stop offset="100%" stop-color="#54aeff"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Shield -->
+  <path d="M 64 8 C 96 8 116 22 116 46 C 116 84 64 120 64 120 C 64 120 12 84 12 46 C 12 22 32 8 64 8 Z"
+        fill="url(#shieldGrad)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Inner Ring / Pulse Monitor -->
+  <circle cx="64" cy="56" r="28" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.3"/>
+  <!-- Monitor Pulse Wave (Wireshark-like event trace) -->
+  <path d="M 32 58 L 48 58 L 56 40 L 64 74 L 72 48 L 80 58 L 96 58"
+        fill="none" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Core Reference Node -->
+  <circle cx="64" cy="74" r="3.5" fill="#ffffff"/>
+  <!-- Status Indicator Dot -->
+  <circle cx="94" cy="30" r="6" fill="#2da44e" stroke="#ffffff" stroke-width="2"/>
+</svg>
+

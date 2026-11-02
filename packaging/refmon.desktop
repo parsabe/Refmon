@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Refmon
+GenericName=Behavioral Reference Monitor
+Comment=Real-time behavioral reference monitor & security incident tracer
+Exec=refmon gui
+Icon=refmon
+Terminal=false
+Categories=System;Security;Monitor;
+Keywords=security;monitor;packet;reference;barrier;audit;
+StartupNotify=true
+

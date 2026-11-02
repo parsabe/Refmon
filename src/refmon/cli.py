@@ -136,6 +136,30 @@ def main(argv: list[str] | None = None) -> int:
         default=3600.0,
         help="seconds between rootkit scans while serving (0: only at start; default 3600)",
     )
+    gui = sub.add_parser(
+        "gui",
+        help="launch interactive Reference Monitor GUI in desktop browser",
+        description=(
+            "Launch Refmon's reference monitor interface. Similar to Wireshark for "
+            "network packets, Refmon GUI traces behavior, role contracts and security "
+            "verdicts in real time, with visual and audio alerts for blocked attack attempts."
+        ),
+    )
+    gui.add_argument("--host", default="127.0.0.1")
+    gui.add_argument("--port", type=int, default=8765)
+    gui.add_argument("--workdir", default=None)
+    gui.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="start daemon without auto-opening desktop browser",
+    )
+    _notify_args(gui)
+    gui.add_argument(
+        "--rootkit-interval",
+        type=float,
+        default=3600.0,
+        help="seconds between rootkit scans while serving (0: only at start; default 3600)",
+    )
     hl = sub.add_parser(
         "health",
         description="Check a running `refmon serve` from outside, through its heartbeat file. "
@@ -314,6 +338,22 @@ def _run(args: argparse.Namespace) -> int:
             workdir=args.workdir,
             hub=hub,
             rootkit_interval_s=args.rootkit_interval,
+        )
+    elif args.command == "gui":
+        from .live import launch_gui
+
+        try:
+            hub = _build_hub(args)
+        except ValueError as exc:
+            print(f"refmon gui: {exc}", file=sys.stderr)
+            return 2
+        return launch_gui(
+            host=args.host,
+            port=args.port,
+            workdir=args.workdir,
+            hub=hub,
+            rootkit_interval_s=args.rootkit_interval,
+            open_browser=not args.no_browser,
         )
     elif args.command == "health":
         import json

@@ -1651,6 +1651,7 @@ def serve_forever(
     workdir: str | Path | None = None,
     hub: NotificationHub | None = None,
     rootkit_interval_s: float = 3600.0,
+    open_browser: bool = False,
 ) -> int:
     from .health import HealthMonitor
     from .notify import ConsoleChannel
@@ -1666,6 +1667,10 @@ def serve_forever(
     ui_url = f"http://localhost:{actual_port}/#token={barrier.api_token}"
     pol = barrier.policy
     print(f"Refmon Live Security Barrier active on {ui_url}", flush=True)
+    if open_browser:
+        import webbrowser
+
+        threading.Timer(0.3, lambda: webbrowser.open(ui_url)).start()
     print(f"  Signed policy : {barrier.policy_path} (mode={pol.mode.value})", flush=True)
     print(f"  Sandbox watch : {barrier.sandbox_dir}", flush=True)
     print(f"  Quarantine    : {barrier.quarantine_dir}", flush=True)
@@ -1720,3 +1725,43 @@ def serve_forever(
         )  # fmt: skip
         hub.close()
     return 0
+
+
+def launch_gui(
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    workdir: str | Path | None = None,
+    hub: NotificationHub | None = None,
+    rootkit_interval_s: float = 3600.0,
+    open_browser: bool = True,
+) -> int:
+    """Launch the Refmon Reference Monitor GUI, connecting to an active daemon if one exists."""
+    import urllib.request
+    import webbrowser
+
+    workdir_path = Path(workdir) if workdir is not None else default_live_workdir()
+    token_file = workdir_path / "api.token"
+    if token_file.is_file():
+        try:
+            token = token_file.read_text(encoding="utf-8").strip()
+            test_url = f"http://{host}:{port}/api/state"
+            req = urllib.request.Request(test_url, headers={"X-Refmon-Token": token})
+            with urllib.request.urlopen(req, timeout=1.5):
+                ui_url = f"http://localhost:{port}/#token={token}"
+                print(f"Refmon GUI: active daemon detected on {ui_url}", flush=True)
+                if open_browser:
+                    with contextlib.suppress(Exception):
+                        webbrowser.open(ui_url)
+                return 0
+        except Exception:
+            pass  # Daemon not running, will start fresh below
+
+    return serve_forever(
+        host=host,
+        port=port,
+        workdir=workdir,
+        hub=hub,
+        rootkit_interval_s=rootkit_interval_s,
+        open_browser=open_browser,
+    )
