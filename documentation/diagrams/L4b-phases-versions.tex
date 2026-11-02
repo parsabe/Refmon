@@ -1,9 +1,13 @@
-% Level 4b: build phases (CLAUDE.md Part B) and the version history v1.0-v1.4
-% (docs/progress.md, docs/variant-seeds.md, docs/design-decisions.md). Wide figure.
-% "Contained" = block + effective hold on the 633 malicious variants of seed 654514256.
+% Level 4b: build phases (CLAUDE.md Part B) and the version history v1.0-v2.0
+% (docs/progress.md, docs/variant-seeds.md, docs/design-decisions.md, docs/evaluation/). Wide figure.
+% Numbers: contained = block + effective hold (a kill counts, F12) of the malicious variants, and the
+% neutral false-block rate, each version on the seed of the round that measured it: v1.0 to v1.3 on
+% 654514256, v1.4 as the baseline of the v1.5 round (833754500), v1.5 to v2.0 each on its own seed.
+% The same numbers as figures/fig_rounds.pdf of the paper.
 \begin{tikzpicture}[rm,
     ms/.style={circle, draw=rmStageLine, fill=rmStage, thick, minimum size=3.2mm, inner sep=0pt},
-    lv/.style={font=\tiny\sffamily, inner sep=1pt, align=center}]
+    lv/.style={font=\tiny\sffamily, inner sep=1pt, align=center},
+    ch/.style={font=\tiny\sffamily, inner sep=1pt, align=center, text width=17mm, text=rmHoldLine}]
   % ---- phases ---------------------------------------------------------------
   \foreach \ph/\nm [count=\ix from 0] in {0/Foundations, 1/Understand, 2/{Policy,\\contracts}, 3/Act,
                                        4/{Report,\\Tune}, 4b/{Math\\core}, 5/Exposure, 6/{Self-test,\\packs},
@@ -16,38 +20,35 @@
   \node[lv, anchor=north] at (p10.south) {human-led};
   \draw[decorate, decoration={brace, amplitude=4pt, mirror}, rmStoreLine]
     ($(p0.south west)+(0.1,-0.1)$) -- ($(p8.south east)+(-0.1,-0.1)$)
-    node[midway, below=4pt, lv] {done: replay-only research code, about 1\,600 tests};
+    node[midway, below=4pt, lv] {done: replay-only research code, 1\,925 tests};
 
   % ---- versions --------------------------------------------------------------
-  \draw[thick, ->, rmInk!70] (0,-2.9) -- (16.6,-2.9);
-  \node[ms] (m0) at (0.8,-2.9) {};
-  \node[ms] (m1) at (4.8,-2.9) {};
-  \node[ms] (m2) at (8.8,-2.9) {};
-  \node[ms] (m3) at (12.8,-2.9) {};
-  \node[ms, densely dashed, fill=white] (m4) at (15.9,-2.9) {};
-
-  \node[lv, anchor=south] at ($(m0.north)+(0,0.08)$) {\textbf{v1.0}\\after Phase 7, frozen\\seed 20261029};
-  \node[lv, anchor=south] at ($(m1.north)+(0,0.08)$) {\textbf{v1.1}\\A46--A50\\seed 268805905};
-  \node[lv, anchor=south] at ($(m2.north)+(0,0.08)$) {\textbf{v1.2}\\A51--A54\\seed 892499628};
-  \node[lv, anchor=south] at ($(m3.north)+(0,0.08)$) {\textbf{v1.3}\\A55--A57\\seed 654514256};
-  \node[lv, anchor=south] at ($(m4.north)+(0,0.08)$) {\textbf{v1.4}\\A59 (in work)\\seed 711829743};
-
-  \foreach \m/\pc in {m0/86.3, m1/98.6, m2/98.6, m3/98.7} {
-    \node[lv, anchor=north, text=rmAllowLine] at ($(\m.south)+(0,-0.06)$) {\textbf{\pc\,\%}\\contained};
+  \def\vy{-3.05}
+  \draw[thick, ->, rmInk!70] (-0.2,\vy) -- (16.95,\vy);
+  % version / decisions / seed recorded before the change / contained / false blocks / what changed
+  \foreach \v/\dec/\seed/\cont/\fb/\chg [count=\i from 0] in {
+      v1.0/{Phase 7, frozen}/20261029/86.6/2.0/{the frozen baseline; Phase 7 found F1--F4},
+      v1.1/A46--A50/268805905/98.6/2.0/{F1--F4: holds pause producers, role-scoped trust, hour window},
+      v1.2/A51--A54/892499628/98.6/2.0/{F5--F7: no channel role in the fallback, no-label blocks act},
+      v1.3/A55--A58/654514256/98.7/2.0/{F8, F9: monotone calculus, benign variants},
+      v1.4/A59/711829743/98.9/0.6/{a label is frozen when it turns persistent},
+      v1.5/A60--A62/833754500/99.1/0.6/{F2: lineage-aware trust; incidents end; bounded state},
+      v1.6/A63/545728926/98.1/0.6/{F11: a labeled block acts on its producers},
+      v1.7/A64/616687759/98.3/1.9/{every live label handed over (property test)},
+      v2.0/A65--A67/171139148/98.4/0.0/{F10: trust as lineage; relay containment}} {
+    \pgfmathsetmacro{\x}{0.6 + 1.97*\i}
+    \node[ms] (m\i) at (\x,\vy) {};
+    \node[lv, anchor=south] at ($(m\i.north)+(0,0.08)$) {\textbf{\v}\\\dec\\seed \seed};
+    \node[lv, anchor=north, text=rmAllowLine] at ($(m\i.south)+(0,-0.06)$)
+      {\textbf{\cont\,\%} contained\\\fb\,\% false blocks};
+    \node[ch, anchor=north] at (\x,\vy-0.78) {\chg};
   }
+  % the current version
+  \node[circle, draw=rmAllowLine, very thick, minimum size=4.6mm, inner sep=0pt] at (m8) {};
 
-  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (2.8,-3.05)
-    {\textbf{F1--F4}: a hold paused nothing; a trusted class excused a fetch; slow-and-low evaded the
-     windows; a pasted command was a Contract fail only for some roles};
-  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (6.8,-3.05)
-    {\textbf{F5--F7}: the fallback paused launchers; a block acted on nothing; one-factor variants
-     did not depend on the seed};
-  \node[lv, anchor=north, text width=28mm, text=rmHoldLine] at (10.8,-3.05)
-    {\textbf{F8, F9}: evidence not monotone in label strength; no benign variants generated};
-  \node[lv, anchor=north, text width=22mm, text=rmHoldLine] at (14.45,-3.05)
-    {a second route to stronger evidence from a weaker label (persistence)};
-
-  \node[lv, anchor=west, align=left] at (0,-5.1)
-    {Each version changes structural rules only in answer to findings of the previous evaluation, never the weights;\\
-     the seed it is measured on is recorded \emph{before} the change, and any later change retires that seed.};
+  \node[lv, anchor=west, align=left] at (-0.2,\vy-2.05)
+    {Each version changes structural rules only in answer to findings of the previous evaluation, never the weights;
+     the seed it is measured on is recorded \emph{before} the change,\\and any later change retires that seed.
+     Green: malicious variants contained (block or effective hold) and neutral benign variants falsely blocked,
+     on the seed of the round that measured the version.};
 \end{tikzpicture}

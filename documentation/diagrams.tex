@@ -152,9 +152,13 @@ version the active seed was recorded for (\texttt{v1.7}, \texttt{v2.0}; a tag th
 version's code is refused), compared, checked against the committed per-variant data, and written into
 \texttt{docs/results.md} together with the golden, coverage, audit, publishability and test results.}
 
-\rmdiagram{L4b-phases-versions}{Build phases (top) and the version history (bottom): each version answers
-the findings of the previous evaluation and is measured on a seed recorded before the change.
-``Contained'' is block plus effective hold on the 633 malicious variants of seed 654514256.}
+\rmdiagram{L4b-phases-versions}{Build phases (top) and the version history \texttt{v1.0} to \texttt{v2.0}
+(bottom, the current version ringed): each version answers the findings of the previous evaluation
+and is measured on a seed recorded before the change. ``Contained'' is block plus effective hold of
+the malicious variants (a kill counts, F12), with the neutral false-block rate, each on the seed of
+the round that measured the version: \texttt{v1.0}--\texttt{v1.3} on \texttt{654514256}, \texttt{v1.4}
+as the baseline of the \texttt{v1.5} round, the later versions on their own seeds. The same numbers
+as the rounds figure of the paper.}
 
 \rmdiagram{L4c-test-layers}{The six test layers of the specification (C9).}
 
