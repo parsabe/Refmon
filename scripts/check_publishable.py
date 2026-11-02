@@ -49,6 +49,7 @@ OK_URL = re.compile(
     r"example\.|\.invalid|\.test\b|localhost|203\.0\.113\.|198\.51\.100\.|192\.0\.2\.|"
     r"github\.com|pypi\.org|python\.org|"
     r"claude\.(?:com|ai)|docs\.pytest|hypothesis|astral\.sh|keepachangelog|semver|json-schema|"
+    r"w3\.org|"
     r"github\.com/(?:astral-sh|pytest|HypothesisWorks)|"
     # the verbatim GPL-3.0 text in LICENSE
     r"//fsf\.org/|//www\.gnu\.org/licenses/"

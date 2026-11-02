@@ -209,6 +209,20 @@ A file such as `shell.php` dropped into `<workdir>/sandbox/web_root/` is quarant
 `<workdir>/quarantine/` (mode `0400`) within about 500 ms. Without a running daemon, `guard` falls
 back to an in-process barrier.
 
+### Reference Monitor GUI (`refmon gui`)
+
+Refmon provides an interactive reference monitor tracer GUI (`make gui` or `refmon gui`). Much like Wireshark acts as a real-time packet tracer for network interfaces, Refmon operates as an interactive provenance and security reference monitor for OS-level commands, process trees, and containment actions:
+
+```bash
+make gui                                             # launch or attach to daemon
+.venv/bin/python -m refmon.cli gui [--port 8765]     # or run directly via CLI
+```
+
+The graphical interface includes:
+- **Interactive Event Stream:** Real-time stream table with instant filtering across all events, blocked attacks, holds, and benign operations.
+- **Threat Alert Notification Card:** Whenever an attack attempt is blocked, a prominent notification card appears immediately. It breaks down the three evaluation questions (Origin, Contract, Effect), highlights the specific containment actions taken, displays the Bayesian evidence score in nats, and provides a quick dismiss button.
+- **Synthesized Web Audio Alert Chimes:** An offline, client-side Web Audio synthesizer generates a distinct two-tone descending alarm chime ($880\,\text{Hz} \to 440\,\text{Hz}$) for blocked attacks and an ascending chime ($587\,\text{Hz} \to 880\,\text{Hz}$) for holds. Includes a persistent sound toggle button and optional HTML5 desktop notifications.
+
 ### Heartbeat, self-test and notifications
 
 While `serve` runs, a health thread:
@@ -372,6 +386,7 @@ installs the library and one command, `refmon`, with these subcommands:
 | Subcommand | Kind |
 |---|---|
 | `lab` | the interactive attack lab |
+| `gui` | interactive reference monitor tracer GUI (desktop / browser, like Wireshark) |
 | `serve` | long-running daemon: barrier, sandbox watcher, local web dashboard |
 | `guard` | one-shot client: judge a command before it runs |
 | `scan-rootkit` | one-shot read-only host scan |
@@ -383,6 +398,32 @@ installs the library and one command, `refmon`, with these subcommands:
 Installed outside the repository, everything except the golden replay works (the 46 golden files
 live in `tests/golden/` and are not part of the wheel); the lab then writes `attack-lab/` in the
 current directory.
+
+### Standalone OS Packages (`.deb` and `.rpm`)
+
+For deployment on Linux systems without Python build tools or `make install`, Refmon provides pre-built distribution packages in `dist/`:
+
+- **Debian / Ubuntu / Linux Mint:**
+  ```bash
+  sudo dpkg -i dist/refmon_2.0.0_all.deb
+  ```
+- **Fedora / RHEL / CentOS / Rocky Linux / openSUSE:**
+  ```bash
+  sudo rpm -ivh dist/refmon-2.0.0-1.noarch.rpm
+  ```
+
+Building packages from source:
+```bash
+make deb          # build dist/refmon_2.0.0_all.deb
+make rpm          # build dist/refmon-2.0.0-1.noarch.rpm
+make packages     # build both packages
+```
+
+Each package installs:
+- The system executable `/usr/bin/refmon`
+- Desktop environment integration via `/usr/share/applications/refmon.desktop`
+- Scalable application icon in `/usr/share/icons/hicolor/scalable/apps/refmon.svg`
+- Reference configuration and documentation in `/usr/share/doc/refmon/`
 
 **Running all the time.** Only `serve` is meant to run continuously. Today it runs as your own user
 and can be kept alive with `tmux`, `nohup` or a `systemd --user` unit where the host allows that,
