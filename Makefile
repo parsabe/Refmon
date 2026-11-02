@@ -4,12 +4,16 @@
 #   make reproduce    regenerate every result table from scratch (docs/results.md, docs/evaluation/)
 #   make all          lint, tests, privacy audit, robustness matrix and the publishability check
 PY ?= .venv/bin/python
+# Refmon needs Python 3.12+ (on the cluster, plain python3 is 3.6); override: make install PYTHON=...
+PYTHON ?= python3.12
 
 .PHONY: install test lint audit matrix publishable reproduce serve scan-rootkit lab all clean
 
-install:
-	python3 -m venv .venv
-	.venv/bin/pip install -e ".[dev]"
+install:  # a venv made by uv has no pip: then uv installs
+	test -x .venv/bin/python || $(PYTHON) -m venv .venv
+	if .venv/bin/python -m pip --version >/dev/null 2>&1; then \
+		.venv/bin/python -m pip install -e ".[dev]"; \
+	else uv pip install --python .venv/bin/python -e ".[dev]"; fi
 
 test:
 	$(PY) -m pytest -q

@@ -614,6 +614,7 @@ class AttackLab:
             "policy_digest": self.barrier.policy_digest[:24],
             "lab_workdir": str(self.barrier.workdir),
             **self.thresholds(),
+            "weights": dict(self.barrier.policy.math.weights),
             "commands_run": len(self.results),
             "own_commands_recorded": "text" if self.record_own else "hmac fingerprint only",
         }
@@ -643,7 +644,8 @@ class AttackLab:
             self.p("Nothing run yet.")
             return
         self.p(self.s.bold("Analysis"))
-        for line in labreport.analyze(self.records(), self.thresholds()):
+        weights = dict(self.barrier.policy.math.weights)
+        for line in labreport.analyze(self.records(), self.thresholds(), weights):
             self.p(line)
 
     def print_score(self) -> None:

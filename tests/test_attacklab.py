@@ -254,12 +254,17 @@ def test_analysis_explains_the_run(tmp_path: Path) -> None:
 
     lab, _ = _lab(tmp_path)
     _run_all(lab)
-    lab_lines = analyze(lab.records(), lab.thresholds())
+    lab_lines = analyze(lab.records(), lab.thresholds(), dict(lab.barrier.policy.math.weights))
     text = "\n".join(lab_lines)
     assert "Detection: 28/28" in text
     assert "False alarms: 0/6" in text
     assert "Absolute overrides" in text and "canary" in text
     assert "closest to the block threshold" in text
+    # remove one signal: pasted-command blocks resting on one Effect fall to -5.11 (ALLOW, S11);
+    # a block whose only Contract signal goes is capped at HOLD by the contract gate
+    assert "Remove any ONE signal from a score-based block: 9/22 would be ALLOWED silently" in text
+    assert "without effect_hide" in text and "-> ALLOW" in text
+    assert "median" in text
     assert "'hidden_script' (malicious) and 'pasted_echo' (harmless)" in text
     assert "contract_external_exec" in text
     assert lab_lines[0] == "1. Headline"

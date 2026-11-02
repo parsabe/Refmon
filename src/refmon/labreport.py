@@ -296,7 +296,7 @@ def markdown_report(records: Sequence[Record], meta: dict[str, Any], templates_m
         "## Analysis",
         "",
         "```text",
-        *analyze(records, _thresholds(meta)),
+        *analyze(records, _thresholds(meta), meta.get("weights")),
         "```",
         "",
         "### Per category",
@@ -364,7 +364,8 @@ def write_report(
     paths["markdown"].write_text(markdown_report(records, meta, templates_md), encoding="utf-8")
     paths["analysis"] = out_dir / "analysis.txt"
     paths["analysis"].write_text(
-        "\n".join(analyze(records, _thresholds(meta))) + "\n", encoding="utf-8"
+        "\n".join(analyze(records, _thresholds(meta), meta.get("weights"))) + "\n",
+        encoding="utf-8",
     )
     paths["templates"].write_text(
         "# Refmon attack lab templates\n\n" + templates_md + "\n", encoding="utf-8"
@@ -386,7 +387,12 @@ def analyze_run(run_dir: str | Path) -> list[str]:
         f"Analysis of {meta['run_id']} (mode {meta.get('policy_mode_at_save', '?')}, "
         f"{len(records)} commands)"
     )
-    return [head, "", *analyze(records, _thresholds(meta))]
+    weights = meta.get("weights")
+    if weights is None:  # a run saved before the weights were recorded: the default policy's
+        from .policy import default_policy
+
+        weights = dict(default_policy().math.weights)
+    return [head, "", *analyze(records, _thresholds(meta), weights)]
 
 
 def strip_ansi(text: str) -> str:
@@ -444,7 +450,45 @@ def compare_runs(run_dirs: Sequence[str | Path]) -> str:
 DEFAULT_THRESHOLDS = {"prior": -6.91, "tau_block": -3.91, "tau_hold": -4.94}
 
 
-def analyze(records: Sequence[Record], thresholds: dict[str, float] | None = None) -> list[str]:
+def _decide(lo: float, tb: float, th: float) -> str:
+    return "BLOCK" if lo >= tb else ("HOLD" if lo >= th else "ALLOW")
+
+
+def _worst_single_removal(
+    r: Record, weights: dict[str, float], tb: float, th: float
+) -> tuple[str, str, float] | None:
+    """Remove each Contract or Effect signal of a block in turn and decide again: within a question
+    only the strongest signal counts (C11.4), and without any Contract signal the contract gate caps
+    a block at HOLD (C11.5). Returns the worst outcome (decision, removed signal, new L)."""
+    groups = {q: sorted(weights[s] for s in r.signals if s.startswith(q + "_") and s in weights)
+              for q in ("contract", "effect")}  # fmt: skip
+    rank = {"ALLOW": 0, "HOLD": 1, "BLOCK": 2}
+    worst: tuple[str, str, float] | None = None
+    for sig in r.signals:
+        q = sig.split("_", 1)[0]
+        if q not in groups or sig not in weights:
+            continue
+        rest = list(groups[q])
+        rest.remove(weights[sig])
+        lo = r.log_odds - (groups[q][-1] - (rest[-1] if rest else 0.0))
+        contract_left = bool(rest) if q == "contract" else bool(groups["contract"])
+        dec = _decide(lo, tb, th)
+        if dec == "BLOCK" and not contract_left:
+            dec = "HOLD"  # the contract gate
+        if (
+            worst is None
+            or rank[dec] < rank[worst[0]]
+            or (rank[dec] == rank[worst[0]] and lo < worst[2])
+        ):
+            worst = (dec, sig, lo)
+    return worst
+
+
+def analyze(
+    records: Sequence[Record],
+    thresholds: dict[str, float] | None = None,
+    weights: dict[str, float] | None = None,
+) -> list[str]:
     """What the run means, as readable lines (plain text that is also valid Markdown)."""
     th = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     tb, thold, prior = th["tau_block"], th["tau_hold"], th["prior"]
@@ -518,9 +562,22 @@ def analyze(records: Sequence[Record], thresholds: dict[str, float] | None = Non
             add(f"       {r.template_id:<16} L={r.log_odds:6.2f}  margin {r.log_odds - tb:+.2f} nats "
                 f"[{', '.join(r.signals) or 'no signals'}]")  # fmt: skip
         mean = sum(r.log_odds - tb for r in scored) / len(scored)
-        add(f"   - Mean margin above BLOCK over {len(scored)} score-based blocks: {mean:+.2f} nats. "
-            "A margin under ~1 nat means losing one signal (e.g. a better-hidden command) "
-            "could turn the block into a hold.")  # fmt: skip
+        add(
+            f"   - Mean margin above BLOCK over {len(scored)} score-based blocks: {mean:+.2f} nats."
+        )
+        if weights:
+            worst = [(r, w) for r in scored if (w := _worst_single_removal(r, weights, tb, thold))]
+            silent = [(r, w) for r, w in worst if w[0] == "ALLOW"]
+            held = [(r, w) for r, w in worst if w[0] == "HOLD"]
+            add(f"   - Remove any ONE signal from a score-based block: {len(silent)}/{len(scored)} "
+                f"would be ALLOWED silently, {len(held)}/{len(scored)} only HELD, "
+                f"{len(scored) - len(silent) - len(held)}/{len(scored)} still BLOCKED.")  # fmt: skip
+            for r, (dec, sig, lo) in sorted(silent + held, key=lambda x: x[1][2])[:6]:
+                add(f"       {r.template_id:<16} without {sig:<28} L={lo:6.2f} -> {dec}")
+            if silent:
+                add("     ALLOWED means silent: pasted text alone (Origin + Contract) is L = -5.11, "
+                    "under HOLD by design (S11), so these blocks rest on the one Effect signal "
+                    "seen in the command text.")  # fmt: skip
     if benign:
         closest = max(benign, key=lambda r: r.log_odds)
         add(f"   - Benign command closest to a false alarm: {closest.template_id} "
@@ -572,10 +629,13 @@ def analyze(records: Sequence[Record], thresholds: dict[str, float] | None = Non
     add("   - 3/2/1 fail rule and evidence calculus agree on every command."
         if not differ else
         f"   - The evidence calculus overruled the 3/2/1 fail rule on: {', '.join(differ)}.")  # fmt: skip
-    cmd = [r for r in records if r.category != "file"]
+    cmd = sorted(r.judge_ms for r in records if r.category != "file")
     if cmd:
+        mid = len(cmd) // 2
+        median = cmd[mid] if len(cmd) % 2 else (cmd[mid - 1] + cmd[mid]) / 2
         add(
-            f"   - Pipeline decision time per command: mean {sum(r.judge_ms for r in cmd) / len(cmd):.1f} ms, "
-            f"max {max(r.judge_ms for r in cmd):.1f} ms (decided before the command starts)."
+            f"   - Pipeline decision time per command: median {median:.1f} ms, "
+            f"mean {sum(cmd) / len(cmd):.1f} ms, max {cmd[-1]:.1f} ms "
+            "(decided before the command starts; the first call of a session is the slowest)."
         )
     return out
