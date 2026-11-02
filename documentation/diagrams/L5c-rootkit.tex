@@ -2,7 +2,7 @@
 \begin{tikzpicture}[rm, eng/.style={rm box, align=left, text width=50mm, minimum height=7.5mm}]
   % ---- engines -------------------------------------------------------------
   \node[eng] (e1) at (0,0)    {\textbf{1 linker\_preload}\\\tiny \texttt{/etc/ld.so.preload}, \texttt{LD\_PRELOAD}, \texttt{LD\_AUDIT}, ephemeral or deleted libraries};
-  \node[eng] (e2) at (0,-1.0) {\textbf{2 fileless\_memory}\\\tiny \texttt{memfd:}, deleted executable, \texttt{/dev/shm}, \texttt{TracerPid}, anonymous \texttt{rwxp}};
+  \node[eng] (e2) at (0,-1.0) {\textbf{2 fileless\_memory}\\\tiny \texttt{memfd:}, deleted executable, \texttt{/dev/shm}, \texttt{TracerPid}, anonymous \texttt{rwxp}\\\tiny (in a JIT runtime: a note, not evidence)};
   \node[eng, fill=rmStage!40] (e3) at (0,-2.0) {\textbf{3 kernel\_module\_crossview}\\\tiny \texttt{/sys/module} vs.\ \texttt{/proc/modules}; forced taint bits (GPU bits: context only)};
   \node[eng, fill=rmStage!40] (e4) at (0,-3.0) {\textbf{4 pid\_crossview}\\\tiny \texttt{/proc} listing vs.\ thread groups and own-UID ancestry};
   \node[eng, fill=rmStage!40] (e5) at (0,-4.0) {\textbf{5 network\_crossview\_sniffer}\\\tiny \texttt{sockstat} vs.\ \texttt{/proc/net/tcp}; \texttt{IFF\_PROMISC} interfaces};

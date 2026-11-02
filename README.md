@@ -13,8 +13,8 @@ types that do not exist yet.
 [Quick start: the attack lab](#quick-start-the-attack-lab) · [Logs and analysis](#logs-and-analysis) ·
 [Live barrier](#live-barrier-daemon-guard-and-web-dashboard) · [Rootkit scanner](#rootkit-scanner) ·
 [Tests](#tests-and-reproduction) · [Results](#results) ·
-[Package and deployment](#package-and-deployment) · [Paper](#paper) · [Layout](#layout) ·
-[Versions](#versions)
+[Package and deployment](#package-and-deployment) · [Paper](#paper) ·
+[Pushing to GitHub](#pushing-to-github) · [Layout](#layout) · [Versions](#versions)
 
 ## Status
 
@@ -27,7 +27,9 @@ Refmon is a **research reference monitor**. What exists and works today:
 - an unprivileged **live barrier** (`refmon serve`, `refmon guard`) with a token-protected local web
   dashboard, a heartbeat, periodic self-tests and notifications (webhook or any command, such as
   `mail`), plus `refmon health` to watch it from outside;
-- a read-only six-engine **rootkit scanner** (`refmon scan-rootkit`).
+- a read-only six-engine **rootkit scanner** (`refmon scan-rootkit`);
+- a **LaTeX paper** with eight charts generated from the committed evaluation data, and a
+  companion diagram book.
 
 What does **not** exist yet: kernel sensors that see every process, file and connection on a host,
 and an enforcer that really pauses, kills or cuts the network of a process (the repository has a
@@ -303,6 +305,8 @@ or personal data is in the tree or the history.
 
 **Golden catalog:** 46/46 scenarios reach their expected decision.
 
+![Golden catalog and the v2.0 outcome split](docs/img/fig_outcomes.png)
+
 **Seeded mutation matrix (v2.0, pre-registered seed `171139148`, 886 variants):**
 
 | | v1.7 | v2.0 |
@@ -312,6 +316,18 @@ or personal data is in the tree or the history.
 | neutral benign allow / hold / block, of 158 | 132 / 24 / 2 | **137 / 21 / 0** |
 | neutral false-block rate | 1.3 % | **0.0 % [0.0, 2.4]** |
 
+Every pre-registered round, each on its own seed: no change lowered containment, and v2.0 is the
+first version with no false block.
+
+![Containment and false blocks across the versions](docs/img/fig_rounds.png)
+
+All ten uncontained malicious variants fall in five scenarios, and every one is a documented gap:
+`S19` and `S27` are slow-and-low (G2 to G5, timing beyond the rate windows), and `S05`, `S07` and
+`S13` each lose one combination that sends a process with no external lineage to a trusted host
+(G1). Every one-factor mutation except timing stays fully contained.
+
+<img src="docs/img/fig_scenarios.png" alt="Outcome per malicious scenario" width="520">
+
 **Attack lab (`lab --test-all`, block mode):**
 
 | | |
@@ -320,7 +336,7 @@ or personal data is in the tree or the history.
 | attacks stopped (never ran or quarantined) | **27/28**; the 60-file burst is detected after the files are written |
 | benign commands allowed | **6/6**, no false alarm |
 | known limit (a script run by name) | missed, as documented |
-| decision time | median 3.9 ms per command, before it runs |
+| decision time | median 4.5 ms per command (32 of 35 under 10 ms), before it runs |
 
 What the analysis of that run shows:
 - Contract failed in 27/28 attacks, Effect in 27/28, Origin in 24/28; four attacks (`canary`,
@@ -337,6 +353,12 @@ What the analysis of that run shows:
   its own trusted hosts.
 - The calculus overruled the 3/2/1 rule five times: three 2-fail attacks become BLOCK instead of
   HOLD, two pasted 2-fail commands become ALLOW instead of HOLD.
+
+<img src="docs/img/fig_lab_evidence.png" alt="Attack lab: evidence per command" width="520">
+
+The reference run is committed (trimmed: no command text, paths or output) as
+`docs/evaluation/lab-reference-run.json`; the charts are built from it and from the per-variant
+files (`make -C documentation figures`).
 
 Version history and every table: [docs/results.md](docs/results.md),
 [docs/v2.0-evaluation.md](docs/v2.0-evaluation.md), [docs/attack-lab.md](docs/attack-lab.md).
@@ -405,8 +427,10 @@ simulated, and its heartbeat says so (*Degraded protection*).
 
 ## Paper
 
-The two-column LaTeX paper (method, mathematics, algorithms, experiments including the attack lab,
-discussion, deployment status, and the proofs in the appendices) is in [documentation/](documentation/):
+The two-column LaTeX paper (method, mathematics, algorithms, experiments with eight data-driven
+charts, the attack lab, the daemon's self-monitoring, discussion, deployment status, and the proofs
+in the appendices; 26 pages) and the level-by-level diagram book are in
+[documentation/](documentation/), with the built `main.pdf`:
 
 ```bash
 make -C documentation figures        # the evaluation charts, from docs/evaluation/ (pip install -e ".[paper]")
@@ -414,6 +438,24 @@ make -C documentation pdf            # documentation/main.pdf (pdflatex, twice)
 make -C documentation diagrams       # the level-by-level diagram book
 make -C documentation overleaf-zip   # refmon-paper-overleaf.zip
 ```
+
+The charts are vector PDFs built by `documentation/make_figures.py` from `docs/evaluation/`, with
+the outcome classes of `scripts/compare_versions.py`, so a chart cannot disagree with a table;
+rebuilding them from unchanged data gives byte-identical files. See
+[documentation/README.md](documentation/README.md).
+
+## Pushing to GitHub
+
+```bash
+scripts/push_to_github.sh --dry-run    # checks, and what would be pushed; pushes nothing
+scripts/push_to_github.sh              # checks, shows, asks [y/N], then pushes
+```
+
+It pushes `master` and the tags `v1.7` and `v2.0` only, never force-pushes, and first runs lint,
+the tests and the publishability check. It never logs in or asks for a password: it uses the
+credentials git on this machine already has (an SSH key in ssh-agent, or a credential helper) and
+stops with a message if there are none. Pushing publishes the author name and e-mail of the
+commits.
 
 ## Layout
 
@@ -424,9 +466,9 @@ make -C documentation overleaf-zip   # refmon-paper-overleaf.zip
 | `src/refmon/schemas/` | typed models: events, labels, stories, contracts, verdicts, actions |
 | `src/refmon/` | `gate.py`, `contain.py` (reversible containment), `policy*.py`, `signing.py`, `learning.py`, `tune.py`, `exposure.py`, `selftest.py`, `heartbeat.py`, `health.py` (the daemon's heartbeat, self-test and watchdog), `notify.py` (notification channels), `report.py`, `pseudonym.py`, `audit.py`, `variants.py`, `intent.py` (pre-execution command intent), `live.py`, `live_ui.py` (daemon and dashboard), `rootkit.py`, `attacklab.py`, `labreport.py` (attack lab, tables, saved runs, analysis), `cli.py` |
 | `tests/` | unit, property, replay, live, rootkit and lab tests; `tests/golden/` holds the 46 scenarios |
-| `scripts/` | `reproduce.py`, `generate_variants.py`, `dump_matrix.py`, `compare_versions.py`, `check_publishable.py` |
-| `docs/` | `results.md`, `attack-lab.md`, `design-decisions.md`, `progress.md`, `review-list.md`, `variant-seeds.md`, `v1.x`/`v2.0-evaluation.md`, `phase-8-plan.md`, `evaluation/` |
-| `documentation/` | the LaTeX paper, diagram book and figures |
+| `scripts/` | `reproduce.py`, `generate_variants.py`, `dump_matrix.py`, `compare_versions.py`, `check_publishable.py`, `push_to_github.sh` |
+| `docs/` | `results.md`, `attack-lab.md`, `design-decisions.md`, `progress.md`, `review-list.md`, `variant-seeds.md`, `v1.x`/`v2.0-evaluation.md`, `phase-8-plan.md`, `evaluation/` (per-variant results of every seed, the lab reference run), `img/` (README charts) |
+| `documentation/` | the LaTeX paper (`main.tex`, `main.pdf`), `make_figures.py` and `figures/`, the diagram book (`diagrams.tex`, `diagrams/`) |
 | `attack-lab/` | created by `refmon lab`, gitignored (see [Logs and analysis](#logs-and-analysis)) |
 | `CLAUDE.md` | the specification: architecture, scenario catalog, evidence calculus (C11), coverage map (C13); tests check weights and coverage against it |
 
@@ -441,5 +483,15 @@ versions (checked by exact replay of the committed results). The code of `v1.0` 
 when the history was squashed; their per-variant results stay in `docs/evaluation/` as a record.
 `v2.0` scopes trust to process lineage (A65) and lets a
 channel role hand containment to the program it started (A66); it removed the last neutral false
-blocks (2/158 → 0/158) without changing any malicious outcome. The attack lab, its analysis and
-the Phase 8 plan are on top of `v2.0`.
+blocks (2/158 → 0/158) without changing any malicious outcome.
+
+On top of `v2.0`, without any change to a rule, weight or decision (the golden catalog, the
+variant matrix and the lab reference run give identical decisions):
+
+- the interactive attack lab and its analysis, and the Phase 8 plan;
+- health and notifications in `refmon serve` (self-test, heartbeat, watchdog, policy
+  re-verification, webhook and command channels) and `refmon health`;
+- the rootkit scanner treats the rwx memory of JIT runtimes as a note, and exits 0/1/2;
+- `make reproduce` replays the versions of the active seed (`v1.7`, `v2.0`) and refuses a tag
+  without its code; the misleading tags `v1.0` to `v1.3` were deleted;
+- the paper's charts and the updated diagram book; `scripts/push_to_github.sh`.

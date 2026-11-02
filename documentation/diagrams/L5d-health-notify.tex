@@ -1,0 +1,55 @@
+% Level 5d: health and notifications of the live daemon (src/refmon/health.py, notify.py,
+% live.py: serve_forever, _notify_verdict; cli.py: health). Wide figure.
+\begin{tikzpicture}[rm]
+  % ---- sources ---------------------------------------------------------------
+  \node[rm box, minimum width=40mm] (vd) at (0,1.55)
+    {barrier verdicts\\\tiny BLOCK or HOLD: one per story, its final decision;\\\tiny dashboard demos never};
+  \node[rm box, minimum width=40mm] (lc) at (0,0.35)
+    {lifecycle\\\tiny started, stopped (Ctrl-C, \texttt{SIGTERM}), mode changed};
+
+  \node[rm note, anchor=south west] at (-2.0,-0.55) {\textbf{health thread} (\texttt{HealthMonitor.tick}, every second)};
+  \node[rm sub, minimum width=40mm] (st) at (0,-1.15) {self-test in a copy of the pipeline\\\tiny at start, then every \texttt{self\_test.interval} (6\,h)};
+  \node[rm sub, minimum width=40mm] (wa) at (0,-2.2)  {sandbox watcher alive?};
+  \node[rm sub, minimum width=40mm] (po) at (0,-3.1)  {policy file re-verified\\\tiny unsigned change: last valid policy kept};
+  \node[rm sub, minimum width=40mm] (rk) at (0,-4.15) {rootkit scan\\\tiny at start, then every \texttt{-{}-rootkit-interval} (1\,h)};
+  \node[rm sub, minimum width=40mm] (dg) at (0,-5.1)  {sensor capabilities\\\tiny missing ones: degraded protection};
+  \draw[rmStageLine!60, rounded corners=3pt] (-2.15,-0.6) rectangle (2.15,-5.6);
+
+  % ---- conditions --------------------------------------------------------------
+  \node[rm dec] (nc) at (4.85,-2.85) {problem new\\or cleared?};
+  \node[rm term] (qu) at (4.85,-4.55) {quiet\\\tiny no repeat each tick};
+  \foreach \s in {st,wa,po,rk,dg} \draw[rm flow] (\s.east) -- (nc.west);
+  \draw[rm flow] (nc) -- node[rm no, right] {no} (qu);
+
+  % ---- hub --------------------------------------------------------------------
+  \node[rm box, minimum width=34mm] (hub) at (8.75,0.35)
+    {\texttt{NotificationHub}\\\tiny fixed phrases, numbers, device pseudonym;\\\tiny never a command, path, host or user};
+  \draw[rm flow] (vd.east) -| (hub.north);
+  \draw[rm flow] (lc.east) -- (hub.west);
+  \draw[rm flow] (nc.east) -| node[rm yes, below, pos=0.3] {yes: appeared, or \emph{Recovered}} (hub.south);
+
+  % ---- channels ---------------------------------------------------------------
+  \node[rm store, minimum width=32mm] (lg) at (13.2,1.55) {\texttt{logs/notifications.jsonl}\\\tiny always};
+  \node[rm store, minimum width=32mm] (te) at (13.2,0.35) {daemon terminal\\\tiny always};
+  \node[rm io, minimum width=30mm] (wh) at (13.2,-1.0) {webhook\\\tiny Slack, Mattermost, ...};
+  \node[rm io, minimum width=30mm] (cm) at (13.2,-2.2) {command, no shell\\\tiny \texttt{mail}, \texttt{notify-send}, ...};
+  \draw[rm flow] (hub.east) -- ++(0.45,0) |- (lg.west);
+  \draw[rm flow] (hub.east) -- (te.west);
+  \draw[rm flow] (hub.east) -- ++(0.45,0) |- (wh.west);
+  \node[rm note, anchor=north east, text width=30mm, align=right] at (12.95,-2.75)
+    {external channels: only the categories of \texttt{-{}-notify-on}, sent by a background thread};
+  \draw[rm flow] (hub.east) -- ++(0.45,0) |- (cm.west);
+  \node[rm note, anchor=south, text width=34mm, align=center] at (13.2,2.5)
+    {a failed delivery is logged and counted, never re-notified};
+
+  % ---- outside view ------------------------------------------------------------
+  \node[rm store, minimum width=30mm] (hb) at (4.85,-6.4) {\texttt{heartbeat.json}\\\tiny every 60\,s and on every change};
+  \draw[rm flow] (dg.south) |- (hb.west);
+  \node[rm box, minimum width=34mm] (he) at (8.75,-6.4) {\texttt{refmon health}\\\tiny from \texttt{cron}: is the process alive,\\\tiny is the heartbeat fresh?};
+  \draw[rm flow] (hb) -- (he);
+  \node[rm term, minimum width=30mm] (ex) at (13.2,-6.4) {exit 0 healthy\\\tiny 1 not running or stale, 2 problem};
+  \draw[rm flow] (he) -- (ex);
+  \draw[rm flow] (he.north) -- node[rm lbl, right] {once per change} ($(he.north)+(0,1.15)$) -| (cm.south);
+  \node[rm note, anchor=north, text width=60mm, align=center] at (8.75,-7.25)
+    {a daemon cannot report its own death: the outside check can};
+\end{tikzpicture}

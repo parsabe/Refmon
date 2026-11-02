@@ -5,7 +5,8 @@
 Inputs, all in the repository: the per-variant results of every pre-registered seed
 (docs/evaluation/<version>-seed-<seed>.jsonl), the attack-lab reference run
 (docs/evaluation/lab-reference-run.json), the golden catalog titles and the signal weights of the
-default policy. Outputs: vector PDFs in documentation/figures/, one per figure. Nothing is measured
+default policy. Outputs: vector PDFs in documentation/figures/, one per figure, and PNG copies of
+four of them in docs/img/ for the GitHub README. Nothing is measured
 here; every number is counted from those files, with the outcome classes of
 scripts/compare_versions.py and the ablation of src/refmon/labreport.py, so a chart cannot disagree
 with a table.
@@ -38,6 +39,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 DATA = ROOT / "docs" / "evaluation"
 OUT = HERE / "figures"
+README_IMG = ROOT / "docs" / "img"  # PNG copies for the GitHub README, which shows no PDF
+README_FIGURES = {"fig_rounds", "fig_outcomes", "fig_scenarios", "fig_lab_evidence"}
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "scripts")]
 
 import compare_versions as cv  # noqa: E402
@@ -123,7 +126,10 @@ def _save(fig, name: str, width: float) -> Path:
     OUT.mkdir(exist_ok=True)
     _fit(fig, width - 2 * plt.rcParams["savefig.pad_inches"])
     path = OUT / f"{name}.pdf"
-    fig.savefig(path)
+    fig.savefig(path, metadata={"CreationDate": None})  # reproducible: same data, same file
+    if name in README_FIGURES:
+        README_IMG.mkdir(parents=True, exist_ok=True)
+        fig.savefig(README_IMG / f"{name}.png", dpi=170, metadata={"Software": None})
     plt.close(fig)
     return path
 

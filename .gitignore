@@ -8,12 +8,13 @@ dist/
 build/
 build/
 
-# LaTeX build files (the compiled main.pdf is kept)
+# LaTeX build files (the compiled main.pdf is kept; the diagram book is built with make diagrams)
 documentation/*.aux
 documentation/*.log
 documentation/*.out
 documentation/*.toc
 documentation/*.lof
+documentation/diagrams.pdf
 
 # attack lab: signed policy, private keys, sandbox, logs and saved runs (refmon lab)
 attack-lab/

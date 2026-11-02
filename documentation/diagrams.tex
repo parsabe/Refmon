@@ -34,7 +34,7 @@
 
 \title{\bfseries Refmon (Provenance Gate v2)\\[2pt]\large Pipeline shapes, diagrams and flowcharts, level by level}
 \author{Companion to the Refmon paper (\texttt{main.tex}); drawn from the source in \texttt{src/refmon/}}
-\date{Specification tag \texttt{v1.3}}
+\date{Specification \texttt{v2.0}, package \texttt{refmon 2.0.0}}
 
 \begin{document}
 \maketitle
@@ -175,5 +175,10 @@ mass change.}
 \rmdiagram{L5c-rootkit}{The read-only rootkit scanner. Cross-view engines are intersected over $m$ passes
 so transient churn drops out; findings are fingerprinted, then scored twice: directly by the calculus and
 through the pipeline.}
+
+\rmdiagram{L5d-health-notify}{Health and notifications of \texttt{refmon serve}. The health thread
+checks every second and notifies a problem only when it appears and when it clears; verdicts notify once
+per story; notifications carry no content. The daemon cannot report its own death, so
+\texttt{refmon health}, run from \texttt{cron}, watches its heartbeat from outside.}
 
 \end{document}
