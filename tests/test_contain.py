@@ -1,7 +1,7 @@
 """Contain (CLAUDE.md Phase 3): labeled-only actions with undo records, and the property that it
 never touches an unlabeled object."""
 
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from evhelp import ev
@@ -131,6 +131,17 @@ EVENT = st.tuples(
 
 @settings(max_examples=80, deadline=None)
 @given(stream=st.lists(EVENT, min_size=1, max_size=18))
+# A process that reports another parent later (p-3: first p-2, then none). The tagger keeps the
+# parent from the first sight, so the launcher p-2 (a producer that ran an exec) hands the hold to
+# p-3 (A66). Found by Hypothesis on 2026-11-02, when the oracle took the last parent seen instead.
+@example(
+    stream=[("request_in", 2, 0, 2, False), ("request_in", 2, 0, 2, False),
+            ("exec", 1, 0, 1, False), ("exec", 2, 0, 1, False), ("request_in", 2, 0, 1, False),
+            ("request_in", 2, 0, 1, False), ("request_in", 2, 0, 1, False),
+            ("request_in", 2, 0, 1, False), ("request_in", 2, 0, 1, False),
+            ("net_connect", 2, 0, 1, False), ("request_end", 3, 2, 1, False),
+            ("request_in", 1, 0, 1, False), ("request_end", 3, 0, 1, False)]
+)  # fmt: skip
 def test_contain_never_touches_an_unlabeled_object(stream):
     events = []
     for i, (kind, proc, parent, obj, new) in enumerate(stream):
@@ -168,11 +179,16 @@ def test_contain_never_touches_an_unlabeled_object(stream):
         if s.event_id in by_event
     } | {p for rec in pipe.linker.records.values() for p in rec.flag_processes}
     channel = set(pipe.policy.non_carrier_roles)
-    role_of = {e.actor.id: e.actor.role for e in events}
+    # a process is registered once, at its first event: its parent and role are the ones it was
+    # started with (Tagger.process); a later event that names another parent does not re-parent it
+    role_of: dict[str, str] = {}
+    parent_of: dict[str, str | None] = {}
+    for e in events:
+        role_of.setdefault(e.actor.id, e.actor.role)
+        parent_of.setdefault(e.actor.id, e.actor.parent)
     # v2.0 (A66): a channel role that produced a signal and started a program hands the fallback
     # to the programs it started
     started = {e.actor.id for e in events if e.type.value == "exec"}
-    parent_of = {e.actor.id: e.actor.parent for e in events}
     producers |= {
         c for c, par in parent_of.items()
         if par in producers and par in started and role_of.get(par) in channel
