@@ -345,6 +345,11 @@ details summary {
       </div>
 
       <div style="margin-top:10px;">
+        <strong style="font-size:12px;">Health: Heartbeat, Self-Test &amp; Notifications</strong>
+        <div id="health-box" class="muted mono" style="margin-top:3px;">Not started by serve.</div>
+      </div>
+
+      <div style="margin-top:10px;">
         <strong style="font-size:12px;">Pending Holds (Human Decision)</strong>
         <div id="holds-list" class="muted" style="margin-top:3px;">None</div>
       </div>
@@ -657,6 +662,25 @@ async function refresh() {
       `Decision: <strong>${esc(rk.calculus_decision).toUpperCase()}</strong> | `
       + `L=${rk.log_odds} nats | findings=${rk.findings.length} | `
       + `modules=${rk.kernel_modules_checked}, procs=${rk.own_processes_inspected}`;
+
+    const hl = st.health;
+    const hb = document.getElementById('health-box');
+    if (hl) {
+      const stt = hl.selftest;
+      const stLine = stt
+        ? `self-test ${stt.passed} passed, ${stt.failed.length ? 'FAILED: ' + stt.failed.join(', ') : 'none failed'} (${stt.ts})`
+        : 'self-test pending';
+      const probs = hl.problems.map(p =>
+        `<div style="color:${p.severity === 'critical' ? 'var(--danger, #c33)' : 'inherit'}">[${esc(p.severity)}] ${esc(p.title)}: ${esc(p.subject)}</div>`
+      ).join('');
+      const recent = hl.notifications.recent.slice(-5).reverse().map(n =>
+        `<div>${esc(n.ts.slice(11, 19))} ${esc(n.severity)} ${esc(n.title)}</div>`
+      ).join('');
+      hb.innerHTML = `<div>heartbeat ${esc(hl.last_heartbeat || '-')} (#${hl.beats}) | ${esc(stLine)}</div>`
+        + (probs || '<div>no problems</div>')
+        + `<div style="margin-top:3px;">notifications: ${hl.notifications.sent} sent, ${hl.notifications.failed} failed; ${esc(hl.notifications.channels)}</div>`
+        + recent;
+    }
 
     const hbox = document.getElementById('holds-list');
     if (!st.holds.length) {

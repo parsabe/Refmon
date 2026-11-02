@@ -10,6 +10,8 @@
     refmon audit [GOLDEN_DIR]                  run the privacy audit
     refmon scan-rootkit [--json]               run read-only multi-engine rootkit scanners
     refmon serve [--port PORT] [--workdir DIR] start live background barrier & web dashboard
+          [--notify-webhook URL] [--notify-command CMD] [--notify-on block,hold,alert,...]
+    refmon health [--workdir DIR] [--json]     is the daemon alive and healthy? (for cron)
     refmon guard [OPTS] -- COMMAND...          intercept and enforce policy on a command
     refmon lab [--list] [--run N ...]          interactive attack lab: templates judged, then run
 
@@ -38,6 +40,44 @@ from .replay import ReplaySource
 
 def _read_key(path: str) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
+
+
+def _notify_args(parser: argparse.ArgumentParser) -> None:
+    from .notify import CATEGORIES
+
+    parser.add_argument(
+        "--notify-webhook",
+        action="append",
+        default=[],
+        metavar="URL",
+        help="POST notifications as JSON to this URL (Slack/Mattermost incoming webhooks work); "
+        "repeatable",
+    )
+    parser.add_argument(
+        "--notify-command",
+        action="append",
+        default=[],
+        metavar="CMD",
+        help="run CMD (no shell) per notification, JSON on stdin, e.g. "
+        "'mail -s Refmon you@example.org'; repeatable",
+    )
+    parser.add_argument(
+        "--notify-on",
+        default=None,
+        metavar="LIST",
+        help=f"categories for the webhook/command: comma list of {', '.join(CATEGORIES)} or all "
+        "(default: block,hold,alert,rootkit,lifecycle; the log file and terminal get everything)",
+    )
+
+
+def _build_hub(args: argparse.Namespace):
+    import shlex
+
+    from .notify import CommandChannel, NotificationHub, WebhookChannel, parse_categories
+
+    external = [WebhookChannel(url) for url in args.notify_webhook]
+    external += [CommandChannel(shlex.split(cmd)) for cmd in args.notify_command]
+    return NotificationHub(external=external, external_categories=parse_categories(args.notify_on))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,15 +111,41 @@ def main(argv: list[str] | None = None) -> int:
     apply_.add_argument("proposal")
     apply_.add_argument("out")
     apply_.add_argument("keyfile")
-    rk = sub.add_parser("scan-rootkit")
+    rk = sub.add_parser(
+        "scan-rootkit",
+        description="Read-only rootkit and stealth scan of this host.",
+        epilog="exit codes: 0 allow (nothing to review), 1 hold (findings to review), 2 block",
+    )
     rk.add_argument("--json", action="store_true", dest="as_json")
     rk.add_argument("--passes", type=int, default=2)
     rk.add_argument("--interval-ms", type=float, default=50.0)
     rk.add_argument("--with-external", action="store_true")
+    rk.add_argument(
+        "--strict-jit",
+        action="store_true",
+        help="also score anonymous rwx memory of JIT runtimes (node, java, Claude Code, ...)",
+    )
     srv = sub.add_parser("serve")
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8765)
     srv.add_argument("--workdir", default=None)
+    _notify_args(srv)
+    srv.add_argument(
+        "--rootkit-interval",
+        type=float,
+        default=3600.0,
+        help="seconds between rootkit scans while serving (0: only at start; default 3600)",
+    )
+    hl = sub.add_parser(
+        "health",
+        description="Check a running `refmon serve` from outside, through its heartbeat file. "
+        "Meant for cron or a systemd timer: it notifies once when the daemon dies or gets a "
+        "problem, and once when it recovers.",
+        epilog="exit codes: 0 healthy, 1 not running or heartbeat stale, 2 running with a problem",
+    )
+    hl.add_argument("--workdir", default=None, help="the daemon's work directory")
+    hl.add_argument("--json", action="store_true", dest="as_json")
+    _notify_args(hl)
     grd = sub.add_parser("guard")
     grd.add_argument("--host", default="localhost")
     grd.add_argument("--port", type=int, default=8765)
@@ -223,6 +289,7 @@ def _run(args: argparse.Namespace) -> int:
             passes=max(1, args.passes),
             pass_interval_s=max(0.0, args.interval_ms / 1000.0),
             run_external=args.with_external,
+            strict_jit=args.strict_jit,
         )
         from .keys import new_device_key
 
@@ -232,11 +299,52 @@ def _run(args: argparse.Namespace) -> int:
             print(json.dumps(report.to_dict(), indent=2))
         else:
             print(format_scan_report(report))
-        return 0 if report.calculus_decision is Decision.ALLOW else 1
+        return {Decision.ALLOW: 0, Decision.HOLD: 1, Decision.BLOCK: 2}[report.calculus_decision]
     elif args.command == "serve":
         from .live import serve_forever
 
-        return serve_forever(host=args.host, port=args.port, workdir=args.workdir)
+        try:
+            hub = _build_hub(args)
+        except ValueError as exc:
+            print(f"refmon serve: {exc}", file=sys.stderr)
+            return 2
+        return serve_forever(
+            host=args.host,
+            port=args.port,
+            workdir=args.workdir,
+            hub=hub,
+            rootkit_interval_s=args.rootkit_interval,
+        )
+    elif args.command == "health":
+        import json
+
+        from .health import check_health, notify_on_change
+        from .live import default_live_workdir
+
+        try:
+            hub = _build_hub(args)
+        except ValueError as exc:
+            print(f"refmon health: {exc}", file=sys.stderr)
+            return 2
+        workdir = Path(args.workdir) if args.workdir else default_live_workdir()
+        now = datetime.now(UTC)
+        code, info = check_health(workdir, now)
+        if hub.external:
+            notify_on_change(workdir, code, info, hub, now)
+        if args.as_json:
+            print(json.dumps(info, indent=2))
+        else:
+            print(f"Refmon daemon: {info['status'].upper()} - {info['reason']}")
+            for key in ("pid", "mode", "heartbeat_age_s", "policy_digest"):
+                if info.get(key) is not None:
+                    print(f"  {key:16} {info[key]}")
+            st = info.get("self_test") or {}
+            if st:
+                failed = ", ".join(st.get("failed") or []) or "none"
+                print(f"  {'self_test':16} passed={st.get('passed')} failed={failed}")
+            for prob in info.get("problems", []):
+                print(f"  - [{prob.get('severity')}] {prob.get('title')}: {prob.get('subject')}")
+        return code
     elif args.command == "lab":
         from .attacklab import main as lab_main
 

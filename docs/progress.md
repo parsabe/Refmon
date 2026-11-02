@@ -282,3 +282,31 @@ Results on the new seed:
 New allowed variants were documented, not fixed: S05 is now listed under G1, and S27 with minutes
 between responses is G5, 0.02 nats under the hold threshold. F10 is closed. Still open: G1 (a
 policy decision) and F3 (needs a pilot baseline).
+
+## Live daemon: heartbeat, self-test, notifications (2026-11-02)
+
+Phase 6 was in the library (`selftest.py`, `heartbeat.py`) but `refmon serve` did not run it: a
+dead protection or a dead daemon told nobody. Now:
+
+- `src/refmon/health.py`: a health thread in `serve` runs the self-test at start and every
+  `self_test.interval`, writes `<workdir>/heartbeat.json` every `heartbeat.interval` (and at once on
+  a change), checks the sandbox watcher, re-verifies the policy file (an unsigned change is an alert
+  and the last valid policy stays; a signed change is adopted), and runs the rootkit scan every
+  `--rootkit-interval`. The missing host sensors are reported once as degraded protection.
+- `src/refmon/notify.py`: notifications to `logs/notifications.jsonl` and the terminal, and to a
+  webhook or a command (`--notify-webhook`, `--notify-command`, `--notify-on`). One per story
+  (its final decision), one per problem when it appears and when it clears; dashboard demos never
+  notify. Fixed phrases, numbers and a device pseudonym only (`pseudonym.key`, random per work
+  directory).
+- `refmon health`: the outside watchdog for cron or a systemd timer; exit 0/1/2, notifies once
+  per change.
+- `serve` handles `SIGTERM` and sends *Refmon stopped*.
+
+Rootkit scanner: anonymous rwx memory of a JIT runtime (matched on the executable path: node, bun,
+deno, Claude Code, VS Code server, java, browsers, dotnet, pypy, luajit, julia) is a context note,
+not evidence. On this login node the only finding was Claude Code's own JIT region, which made every
+scan HOLD. A deleted, memfd or /tmp executable is never excused; `--strict-jit` restores the old
+scoring. `scan-rootkit` now exits 0 allow, 1 hold, 2 block (block was 1).
+
+Tests: `tests/test_health.py` (25) and 10 new cases in `tests/test_rootkit.py`. Not checked: the
+dashboard's new health panel in a browser (no browser or node on the cluster).

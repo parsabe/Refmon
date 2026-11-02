@@ -21,11 +21,12 @@ types that do not exist yet.
 Refmon is a **research reference monitor**. What exists and works today:
 
 - the full decision pipeline with a signed policy, verified by 46 golden scenarios, seeded mutation
-  matrices (886 variants in the last round) and over 1,880 automated tests;
+  matrices (886 variants in the last round) and over 1,900 automated tests;
 - an **interactive CLI attack lab** (`refmon lab`): 35 harmless attack and benign templates, each
   judged by the live pipeline *before* it may run, with saved logs and an automatic analysis;
 - an unprivileged **live barrier** (`refmon serve`, `refmon guard`) with a token-protected local web
-  dashboard;
+  dashboard, a heartbeat, periodic self-tests and notifications (webhook or any command, such as
+  `mail`), plus `refmon health` to watch it from outside;
 - a read-only six-engine **rootkit scanner** (`refmon scan-rootkit`).
 
 What does **not** exist yet: kernel sensors that see every process, file and connection on a host,
@@ -206,6 +207,53 @@ A file such as `shell.php` dropped into `<workdir>/sandbox/web_root/` is quarant
 `<workdir>/quarantine/` (mode `0400`) within about 500 ms. Without a running daemon, `guard` falls
 back to an in-process barrier.
 
+### Heartbeat, self-test and notifications
+
+While `serve` runs, a health thread:
+
+| Check | When | Problem it reports |
+|---|---|---|
+| self-test: one harmless synthetic story per enabled protection, against a copy of the live pipeline | at start, then every `self_test.interval` of the signed policy (6 h) | *Protection not working* (a protection missed its expected decision) |
+| heartbeat to `<workdir>/heartbeat.json` | every `heartbeat.interval` (60 s), and at once when a problem appears or clears | - |
+| sandbox watcher alive | every second | *Sandbox watcher stopped* |
+| policy file on disk | every second | *Policy rejected* (fails its signature; the last valid policy stays); a validly signed change is adopted |
+| rootkit scan | at start, then every `--rootkit-interval` s (3600) | *Rootkit scan: HOLD/BLOCK* |
+| sensors | at start | *Degraded protection*: the live barrier has no host sensor for process ancestry, connections, ... |
+
+A notification goes out when a problem **appears** and when it **clears** (*Recovered*), never on
+every tick. Blocks and holds are notified once per story with their final decision; dashboard
+demos (presets, golden replays) never are. Every notification is written to
+`<workdir>/logs/notifications.jsonl` and printed on the daemon's terminal. Like a verdict that
+leaves the device, it carries fixed phrases, numbers and a device pseudonym only: never a command,
+path, URL, host name or user name.
+
+External channels get the categories `block`, `hold`, `alert`, `rootkit` and `lifecycle` (started,
+stopped, mode changed) unless `--notify-on` says otherwise (`degraded`, or `all`):
+
+```bash
+# a Slack/Mattermost/Rocket.Chat incoming webhook ({"text": ..., "refmon": {...}} is POSTed)
+.venv/bin/python -m refmon.cli serve --notify-webhook https://chat.example.org/hooks/XYZ
+# any program, run without a shell: the notification as JSON on stdin,
+# the headline in $REFMON_TITLE, $REFMON_SEVERITY, $REFMON_CATEGORY and $REFMON_TEXT
+.venv/bin/python -m refmon.cli serve --notify-command "mail -s Refmon you@example.org"
+.venv/bin/python -m refmon.cli serve --notify-command "notify-send Refmon" --notify-on all
+```
+
+A daemon cannot report its own crash, so watch it from outside with `refmon health`. It reads the
+heartbeat file, checks that the process still exists, and exits with 0 (healthy), 1 (not running
+or heartbeat stale) or 2 (running with a problem). With `--notify-*` options it notifies once when
+the state changes and once when it recovers, so it can run from cron every few minutes:
+
+```bash
+make health                                                          # or:
+.venv/bin/python -m refmon.cli health [--workdir DIR] [--json]
+# crontab -e:
+*/5 * * * * cd ~/Refmon && .venv/bin/python -m refmon.cli health --notify-command "mail -s Refmon you@example.org" >/dev/null
+```
+
+`serve` stops cleanly on Ctrl-C and on `SIGTERM` (as sent by `kill` or systemd) and then sends
+*Refmon stopped*.
+
 ## Rootkit scanner
 
 ```bash
@@ -219,6 +267,17 @@ binaries in `/dev/shm` or `/tmp`, `TracerPid`, anonymous `rwxp`); kernel-module 
 decoding; process cross-view across `m ≥ 2` passes; socket cross-view and promiscuous interfaces;
 optional `unhide`/`chkrootkit`/`rkhunter` bridge.
 
+Exit codes: 0 allow, 1 hold (findings to review), 2 block. So `make scan-rootkit` reports
+`Error 1` or `Error 2` when there is something to look at.
+
+JIT compilers (Node, Bun, Java, VS Code, Claude Code, browsers, ...) keep anonymous writable and
+executable memory for the code they generate. When the executable of such a process matches a known
+JIT runtime path, the region is shown as a note (`anonymous rwx memory in 1 JIT runtime process
+(claude_code x1): ... not scored`) instead of counting as evidence. A deleted, `memfd:` or `/tmp`
+executable is never excused, whatever its name, and every other check of that process still runs.
+Malware running as your own user could copy itself to a matching path; `--strict-jit` scores these
+regions anyway.
+
 ## Tests and reproduction
 
 ```bash
@@ -229,7 +288,7 @@ make all                                                  # lint, tests, privacy
 make reproduce                                            # regenerate every result table (slow)
 ```
 
-Over 1,880 tests: unit tests per rule, contract, effect and override; Hypothesis property tests
+Over 1,900 tests: unit tests per rule, contract, effect and override; Hypothesis property tests
 (labels never lost, no raw content after Observe, Contain never touches an unlabeled object, ...);
 replay of the 46 golden scenarios; the privacy audit; rootkit, live-barrier, CLI and attack-lab
 tests. One test is an expected failure (`xfail`): a documented limit of the S19 stand-in.
@@ -292,6 +351,7 @@ installs the library and one command, `refmon`, with these subcommands:
 | `serve` | long-running daemon: barrier, sandbox watcher, local web dashboard |
 | `guard` | one-shot client: judge a command before it runs |
 | `scan-rootkit` | one-shot read-only host scan |
+| `health` | one-shot: is the daemon alive and healthy (for cron), notifies on change |
 | `keygen`, `init-policy`, `sign`, `verify` | the signed policy |
 | `learn`, `approve`, `apply` | contract learning: proposals that a person approves |
 | `audit` | the privacy audit |
@@ -301,9 +361,27 @@ live in `tests/golden/` and are not part of the wheel); the lab then writes `att
 current directory.
 
 **Running all the time.** Only `serve` is meant to run continuously. Today it runs as your own user
-and can be kept alive with `tmux`, `nohup` or a `systemd --user` unit where the host allows that.
-Running always does not make it a barrier for the whole host: it still sees only what is sent to it
-and its own sandbox, and its enforcer is simulated.
+and can be kept alive with `tmux`, `nohup` or a `systemd --user` unit where the host allows that,
+with `refmon health` from cron as the outside watchdog (see
+[Heartbeat, self-test and notifications](#heartbeat-self-test-and-notifications)). For example
+`~/.config/systemd/user/refmon.service`:
+
+```ini
+[Unit]
+Description=Refmon live barrier
+
+[Service]
+WorkingDirectory=%h/Refmon
+ExecStart=%h/Refmon/.venv/bin/python -m refmon.cli serve --workdir %h/.refmon --notify-command "mail -s Refmon you@example.org"
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Start it with `systemctl --user enable --now refmon`. Running always does not make it a barrier for
+the whole host: it still sees only what is sent to it and its own sandbox, its enforcer is
+simulated, and its heartbeat says so (*Degraded protection*).
 
 **What a deployment between users and servers needs** (Phase 8 and 9 of `CLAUDE.md`; details in
 [docs/phase-8-plan.md](docs/phase-8-plan.md)):
@@ -341,7 +419,7 @@ make -C documentation overleaf-zip   # refmon-paper-overleaf.zip
 | `src/refmon/pipeline/` | `observe`, `tag`, `link`, `judge`, `rates`, `signals`, `features`, `pipeline` |
 | `src/refmon/calculus/` | evidence (log-likelihood ratios, thresholds), labels (decay, noisy-OR), rarity (Laplace, Good-Turing), stats (Poisson, CUSUM), privacy (Laplace noise, k-anonymity, Bloom) |
 | `src/refmon/schemas/` | typed models: events, labels, stories, contracts, verdicts, actions |
-| `src/refmon/` | `gate.py`, `contain.py` (reversible containment), `policy*.py`, `signing.py`, `learning.py`, `tune.py`, `exposure.py`, `selftest.py`, `heartbeat.py`, `report.py`, `pseudonym.py`, `audit.py`, `variants.py`, `intent.py` (pre-execution command intent), `live.py`, `live_ui.py` (daemon and dashboard), `rootkit.py`, `attacklab.py`, `labreport.py` (attack lab, tables, saved runs, analysis), `cli.py` |
+| `src/refmon/` | `gate.py`, `contain.py` (reversible containment), `policy*.py`, `signing.py`, `learning.py`, `tune.py`, `exposure.py`, `selftest.py`, `heartbeat.py`, `health.py` (the daemon's heartbeat, self-test and watchdog), `notify.py` (notification channels), `report.py`, `pseudonym.py`, `audit.py`, `variants.py`, `intent.py` (pre-execution command intent), `live.py`, `live_ui.py` (daemon and dashboard), `rootkit.py`, `attacklab.py`, `labreport.py` (attack lab, tables, saved runs, analysis), `cli.py` |
 | `tests/` | unit, property, replay, live, rootkit and lab tests; `tests/golden/` holds the 46 scenarios |
 | `scripts/` | `reproduce.py`, `generate_variants.py`, `dump_matrix.py`, `compare_versions.py`, `check_publishable.py` |
 | `docs/` | `results.md`, `attack-lab.md`, `design-decisions.md`, `progress.md`, `review-list.md`, `variant-seeds.md`, `v1.x`/`v2.0-evaluation.md`, `phase-8-plan.md`, `evaluation/` |

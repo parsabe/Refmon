@@ -7,7 +7,7 @@ PY ?= .venv/bin/python
 # Refmon needs Python 3.12+ (on the cluster, plain python3 is 3.6); override: make install PYTHON=...
 PYTHON ?= python3.12
 
-.PHONY: install test lint audit matrix publishable reproduce serve scan-rootkit lab all clean
+.PHONY: install test lint audit matrix publishable reproduce serve health scan-rootkit lab all clean
 
 install:  # a venv made by uv has no pip: then uv installs
 	test -x .venv/bin/python || $(PYTHON) -m venv .venv
@@ -37,7 +37,10 @@ reproduce:
 serve:
 	$(PY) -m refmon.cli serve
 
-scan-rootkit:
+health:  # is the daemon alive? exit 0 healthy, 1 not running or stale, 2 running with a problem
+	$(PY) -m refmon.cli health
+
+scan-rootkit:  # exit 0 allow, 1 hold (findings to review), 2 block
 	$(PY) -m refmon.cli scan-rootkit
 
 lab:

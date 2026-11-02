@@ -14,6 +14,8 @@ import json
 import os
 import secrets
 import shutil
+import signal
+import socket
 import subprocess
 import tempfile
 import threading
@@ -34,9 +36,11 @@ from .golden import load_golden_cases
 from .intent import analyze as analyze_command
 from .keys import new_device_key
 from .live_ui import DASHBOARD_HTML
+from .notify import LogChannel, Notification, NotificationHub
 from .pipeline import Pipeline
 from .policy import Policy, default_policy_dict
-from .policy_io import load_policy_data, read_document, write_signed
+from .policy_io import LoadedPolicy, load_policy_data, read_document, write_signed
+from .pseudonym import Pseudonymizer
 from .replay import ReplaySource
 from .report import Reporter, action_taken, what_happened
 from .rootkit import RootkitScanReport, ScanConfig, evaluate_rootkit_scan
@@ -239,7 +243,11 @@ class LiveBarrier:
     """Thread-safe live Reference Monitor barrier with signed policy and sandbox enforcement."""
 
     def __init__(
-        self, workdir: str | Path | None = None, *, golden_dir: Path | None = None
+        self,
+        workdir: str | Path | None = None,
+        *,
+        golden_dir: Path | None = None,
+        hub: NotificationHub | None = None,
     ) -> None:
         self.workdir = Path(workdir) if workdir is not None else default_live_workdir()
         self.golden_dir = golden_dir or (Path(__file__).resolve().parents[2] / "tests" / "golden")
@@ -270,8 +278,17 @@ class LiveBarrier:
         self._seen_files: dict[str, tuple[int, int]] = {}
         self._stop_event = threading.Event()
         self._watcher_thread: threading.Thread | None = None
+        self.watcher_beat = time.monotonic()  # the watcher loop's last turn (health check)
+        self.health: Any = None  # a HealthMonitor once `serve` starts one
+        self._demo_depth = 0  # > 0 while a dashboard preset runs (under the lock)
 
         self._bootstrap_workspace()
+        # Notifications: always logs/notifications.jsonl; `serve` adds the terminal and external
+        # channels.
+        self.hub = hub if hub is not None else NotificationHub()
+        self.hub.local.insert(0, LogChannel(self.logs_dir / "notifications.jsonl"))
+        if self.hub.on_failure is None:
+            self.hub.on_failure = self._log_line
         loaded = load_policy_data(self.policy_path, [self._public_key()])
         self.policy: Policy = loaded.policy
         self.policy_digest: str = loaded.digest
@@ -283,6 +300,14 @@ class LiveBarrier:
             _secret_file(self.device_key_path, lambda: new_device_key().hex())
         )
         self.api_token = _secret_file(self.api_token_path, lambda: secrets.token_urlsafe(32))
+        # Heartbeats and notifications name the device by pseudonym only (Part A).
+        self.pseudonymizer = Pseudonymizer(
+            key=bytes.fromhex(
+                _secret_file(self.workdir / "pseudonym.key", lambda: secrets.token_hex(32))
+            )
+        )
+        self.device_name = socket.gethostname() or "local-host"
+        self.device_pseudonym = self.pseudonymizer.device(self.device_name)
         # a daemon runs for weeks: keep six hours of stories (A62); verdicts are already logged
         self.pipeline = Pipeline(self.policy, key=self._device_key, gate=True, retain=_RETAIN_S)
         self.reporter = Reporter(self.pipeline)
@@ -345,15 +370,34 @@ class LiveBarrier:
             unsigned["mode"] = mode.value
             write_signed(unsigned, self._private_key(), self.policy_path)
             loaded = load_policy_data(self.policy_path, [self._public_key()])
+            self.adopt_policy(loaded, why="mode switched")
+            return {"mode": self.policy.mode.value, "digest": self.policy_digest}
+
+    def adopt_policy(self, loaded: LoadedPolicy, *, why: str) -> None:
+        """Put a verified policy in force (the caller loaded it with signature checking)."""
+        with self._lock:
+            old_mode = self.policy.mode
             self.policy = loaded.policy
             self.policy_digest = loaded.digest
             self.signature_ok = True
             self.pipeline.set_policy(self.policy)
             self._log_line(
-                f"Signed policy updated -> mode={self.policy.mode.value.upper()} "
+                f"Signed policy updated ({why}) -> mode={self.policy.mode.value.upper()} "
                 f"({self.policy_digest[:18]}...)"
             )
-            return {"mode": self.policy.mode.value, "digest": self.policy_digest}
+            if self.policy.mode is not old_mode:
+                self.notify(
+                    Notification(
+                        "lifecycle",
+                        "warning" if self.policy.mode is not Mode.BLOCK else "info",
+                        "Mode changed",
+                        f"enforcement mode {old_mode.value} -> {self.policy.mode.value} ({why})",
+                        self.device_pseudonym,
+                    )
+                )
+
+    def notify(self, note: Notification, key: str | None = None) -> bool:
+        return self.hub.send(note, key=key)
 
     # -- logging & event ingestion -------------------------------------------------------------
 
@@ -401,8 +445,11 @@ class LiveBarrier:
             context={"extra_roles": tuple(self.policy.extra_roles)},
         )
 
-    def _feed_raw_events(self, events: list[RawEvent]) -> tuple[str, Any]:
+    def _feed_raw_events(self, events: list[RawEvent], *, demo: bool = False) -> tuple[str, Any]:
+        """Run events through the pipeline. `demo`: a preset or golden replay from the dashboard;
+        logged like any story, but never notified as an incident (like a self-test story)."""
         last_story_id = ""
+        strongest: dict[str, Any] = {}  # one notification per story: its final decision
         for raw_ev in events:
             outputs = self.pipeline.process(raw_ev)
             observed = self.pipeline.observe.buffer[-1]
@@ -424,16 +471,57 @@ class LiveBarrier:
                     f"[{rep.verdict.story_id}] L={rep.verdict.log_odds:.2f} nats | "
                     f"{rep.what_happened}"
                 )
+                prev = strongest.get(rep.verdict.story_id)
+                if prev is None or _rank(rep.verdict.decision) >= _rank(prev.verdict.decision):
+                    strongest[rep.verdict.story_id] = rep
 
             for sid, rec in self.pipeline.linker.records.items():
                 if rec.events and rec.events[-1].event_id == observed.event_id:
                     last_story_id = sid
                     break
 
+        if not demo and not self._demo_depth:
+            for rep in strongest.values():
+                self._notify_verdict(rep)
+
         if not last_story_id and self.pipeline.linker.records:
             last_story_id = next(reversed(self.pipeline.linker.records))
         judgement = self.pipeline.judge(self.pipeline.record(last_story_id))
         return last_story_id, judgement
+
+    def _notify_verdict(self, rep: Any) -> None:
+        v = rep.verdict
+        if v.decision is Decision.ALLOW:
+            return
+        observe = v.mode is not Mode.BLOCK
+        if v.decision is Decision.BLOCK:
+            category, severity = "block", "critical"
+            title = "Would block (not enforced)" if observe else "Blocked"
+        else:
+            category, severity = "hold", "warning"
+            title = "Would hold (not enforced)" if observe else "Held: an answer is needed"
+        holds = []
+        if self.pipeline.gate is not None:
+            holds = [
+                h.hold_id
+                for h in self.pipeline.gate.holds.values()
+                if h.story_id == v.story_id and h.state.value == "pending"
+            ]
+        message = f"{rep.what_happened} {rep.action_taken} Next: {rep.next_step}"
+        if holds:
+            message += " Answer the hold in the dashboard."
+        self.notify(
+            Notification(
+                category, severity, title, message, self.device_pseudonym,
+                details={
+                    "story_id": v.story_id, "decision": v.decision.value, "mode": v.mode.value,
+                    "log_odds": round(float(v.log_odds or 0.0), 2), "tactics": list(v.tactics),
+                    "platform": rep.platform, "holds": holds,
+                    "override": v.override.value if v.override else None,
+                },
+            ),
+            key=f"verdict:{v.story_id}:{v.decision.value}",
+        )  # fmt: skip
 
     def _explain_story(self, story_id: str, judgement: Any) -> str:
         rep = self.reporter.reports.get(story_id)
@@ -780,6 +868,7 @@ class LiveBarrier:
 
         def _loop() -> None:
             while not self._stop_event.wait(interval_s):
+                self.watcher_beat = time.monotonic()
                 try:
                     self.scan_sandbox_once()
                 except OSError:
@@ -798,6 +887,15 @@ class LiveBarrier:
     # -- presets, full suite, golden scenarios, holds & rootkit --------------------------------
 
     def run_preset(self, name: str) -> dict[str, Any]:
+        """A dashboard demo: its stories are logged but never notified as incidents."""
+        with self._lock:
+            self._demo_depth += 1
+            try:
+                return self._run_preset(name)
+            finally:
+                self._demo_depth -= 1
+
+    def _run_preset(self, name: str) -> dict[str, Any]:
         spec = _PRESET_BY_ID.get(name)
         if spec is None:
             raise ValueError(f"unknown preset {name!r}")
@@ -878,12 +976,16 @@ class LiveBarrier:
                     (i for i in reversed(inc_list) if i.get("kind") == "web_root_write"), None
                 )
                 if inc is None:
-                    inc = inc_list[-1] if inc_list else {
-                        "story_id": "st-ws",
-                        "decision": "block",
-                        "log_odds": -0.11,
-                        "quarantined": shell_file.name,
-                    }
+                    inc = (
+                        inc_list[-1]
+                        if inc_list
+                        else {
+                            "story_id": "st-ws",
+                            "decision": "block",
+                            "log_odds": -0.11,
+                            "quarantined": shell_file.name,
+                        }
+                    )
                 q_dest = inc.get("quarantined", "quarantined")
                 return {
                     "attack_type": label,
@@ -905,11 +1007,15 @@ class LiveBarrier:
                     None,
                 )
                 if inc is None:
-                    inc = inc_list[-1] if inc_list else {
-                        "story_id": "st-rw",
-                        "decision": "block",
-                        "log_odds": -2.41,
-                    }
+                    inc = (
+                        inc_list[-1]
+                        if inc_list
+                        else {
+                            "story_id": "st-rw",
+                            "decision": "block",
+                            "log_odds": -2.41,
+                        }
+                    )
                 # Prune test files so workspace doesn't accumulate hundreds of files across runs
                 shutil.rmtree(batch_dir, ignore_errors=True)
                 for idx in range(55):
@@ -1055,7 +1161,7 @@ class LiveBarrier:
                         attrs={"host": "pypi.org"},
                     ),
                 ]
-                story_id, j = self._feed_raw_events(events)
+                story_id, j = self._feed_raw_events(events, demo=True)
                 self._tag_story(
                     story_id,
                     attack_type=label,
@@ -1140,7 +1246,7 @@ class LiveBarrier:
                 )
                 for ev in events
             ]
-            story_id, j = self._feed_raw_events(namespaced)
+            story_id, j = self._feed_raw_events(namespaced, demo=True)
             lo = round(float(j.log_odds or 0.0), 2)
             title = matched.expected.title
             exp = matched.expected.decision.value
@@ -1327,9 +1433,14 @@ class LiveBarrier:
                 "holds": holds,
                 "quarantined": quarantined,
                 "rootkit": self.last_rootkit.to_dict(),
+                "health": self.health.snapshot() if self.health is not None else None,
                 "barrier_log": list(self._barrier_tail)[-50:],
                 "events_log": list(self._events_tail)[-25:],
             }
+
+
+def _rank(decision: Decision) -> int:
+    return {Decision.ALLOW: 0, Decision.HOLD: 1, Decision.BLOCK: 2}[decision]
 
 
 def _describe_enforcement(
@@ -1534,24 +1645,78 @@ def send_guard_request(
 
 
 def serve_forever(
-    *, host: str = "127.0.0.1", port: int = 8765, workdir: str | Path | None = None
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    workdir: str | Path | None = None,
+    hub: NotificationHub | None = None,
+    rootkit_interval_s: float = 3600.0,
 ) -> int:
-    barrier = LiveBarrier(workdir=workdir)
+    from .health import HealthMonitor
+    from .notify import ConsoleChannel
+
+    hub = hub if hub is not None else NotificationHub()
+    hub.local.append(ConsoleChannel())
+    barrier = LiveBarrier(workdir=workdir, hub=hub)
     barrier.start_background_watcher()
     server = make_http_server(barrier, host=host, port=port)
+    monitor = HealthMonitor(barrier, rootkit_interval_s=rootkit_interval_s)
+    barrier.health = monitor
     actual_port = server.server_address[1]
     ui_url = f"http://localhost:{actual_port}/#token={barrier.api_token}"
+    pol = barrier.policy
     print(f"Refmon Live Security Barrier active on {ui_url}", flush=True)
-    print(f"  Signed policy : {barrier.policy_path} (mode={barrier.policy.mode.value})", flush=True)
+    print(f"  Signed policy : {barrier.policy_path} (mode={pol.mode.value})", flush=True)
     print(f"  Sandbox watch : {barrier.sandbox_dir}", flush=True)
     print(f"  Quarantine    : {barrier.quarantine_dir}", flush=True)
     print(f"  Live logs     : {barrier.logs_dir}", flush=True)
     print(f"  API token     : {barrier.api_token_path} (required by every /api/ call)", flush=True)
+    print(
+        f"  Heartbeat     : {monitor.heartbeat_path} every {int(pol.heartbeat.interval)} s "
+        f"(check from outside: refmon health --workdir {barrier.workdir})",
+        flush=True,
+    )
+    print(
+        f"  Self-test     : at start, then every {int(pol.self_test.interval)} s; rootkit scan "
+        + (f"every {int(rootkit_interval_s)} s" if rootkit_interval_s > 0 else "off"),
+        flush=True,
+    )
+    print(f"  Notifications : {hub.describe()}", flush=True)
+
+    def _terminate(signum: int, frame: Any) -> None:  # systemd and kill send SIGTERM
+        raise KeyboardInterrupt
+
+    in_main = threading.current_thread() is threading.main_thread()
+    previous = signal.signal(signal.SIGTERM, _terminate) if in_main else None
+    barrier.notify(
+        Notification(
+            "lifecycle", "info", "Refmon started",
+            f"live barrier running in {pol.mode.value} mode; notifications: {hub.describe()}",
+            barrier.device_pseudonym,
+        )
+    )  # fmt: skip
+    monitor.start()
+    reason = "stopped by signal"
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    except Exception as exc:  # the server loop died: say so before exiting
+        reason = f"server error {type(exc).__name__}"
+        raise
     finally:
+        if in_main:
+            signal.signal(signal.SIGTERM, previous)
+        monitor.stop()
         server.server_close()
         barrier.stop_background_watcher()
+        barrier.notify(
+            Notification(
+                "lifecycle", "warning", "Refmon stopped",
+                f"the live barrier is no longer running ({reason}); nothing is judged until it "
+                "is started again",
+                barrier.device_pseudonym,
+            )
+        )  # fmt: skip
+        hub.close()
     return 0
